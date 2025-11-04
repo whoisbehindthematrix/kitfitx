@@ -1,0 +1,42 @@
+import { Request, Response } from "express";
+import prisma from "../lib/prismaClient";
+import { cycleEntrySchema } from "../validation/cycleSchemas.validation";
+
+export const addCycleEntry = async (req: Request, res: Response) => {
+  try {
+    const parsed = cycleEntrySchema.parse(req.body);
+    const userId = req.user?.sub;
+
+    const entry = await prisma.cycleEntry.create({
+      data: {
+        userId: userId!,
+        date: new Date(parsed.date),
+        isPeriod: parsed.isPeriod,
+        flowIntensity: parsed.flowIntensity,
+        symptoms: parsed.symptoms,
+        notes: parsed.notes,
+      },
+    });
+
+    res.json(entry);
+  } catch (err) {
+    if (err.name === "ZodError") {
+      return res.status(400).json({ error: err.errors });
+    }
+    console.error(err);
+    res.status(500).json({ error: "Failed to add cycle entry" });
+  }
+};
+
+export const getCycleEntries = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.sub;
+    const entries = await prisma.cycleEntry.findMany({
+      where: { userId },
+      orderBy: { date: "desc" },
+    });
+    res.json(entries);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch entries" });
+  }
+};

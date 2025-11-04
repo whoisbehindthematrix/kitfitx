@@ -13,3 +13,96 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+
+
+model User {
+  id             String       @id @default(cuid())
+  email          String?      @unique
+  displayName    String?
+  avatarUrl      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  role           Role         @default(USER)
+
+
+  profile        UserProfile?
+  cycleEntries   CycleEntry[]
+  predictions    PredictionData[]
+}
+
+// ===========================================
+// USER PROFILE
+// ===========================================
+model UserProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id])
+  
+  fullName              String?
+  dateOfBirth           DateTime?
+  gender                String?
+  timezone              String?
+  
+  averageCycleLength     Int      @default(28)
+  periodDuration         Int      @default(5)
+  lutealPhaseDays        Int      @default(14)
+  lastPeriodStart        DateTime?
+  menopauseStatus        String?  // "pre" | "peri" | "post" menopauseStatus is a medical lifecycle indicator for women.
+  
+  wellnessGoals          String[] @default([])
+  dailyCalorieGoal       Int?
+  activityLevel          String?
+  height                 Float?
+  weight                 Float?
+  targetWeight           Float?
+  unitsSystem            String?  // "metric" | "imperial"
+  
+  theme                  String?  // "light" | "dark" | "auto"
+  notifications          Json?
+  language               String?
+  
+  onboardingCompleted    Boolean  @default(false)
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  lastSyncedAt           DateTime?
+  appVersion             String?
+}
+
+// ===========================================
+// CYCLE ENTRIES (Daily logs)
+// ===========================================
+model CycleEntry {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  
+  date           DateTime
+  isPeriod       Boolean
+  flowIntensity  String?     // light | medium | heavy | spotting
+  symptoms       Json?
+  notes          String?
+}
+
+// ===========================================
+// PREDICTIONS (Generated insights)
+// ===========================================
+model PredictionData {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+
+  nextPeriod    DateTime?
+  ovulation     DateTime?
+  fertileWindow Json?       // { start, peak, end, confidence }
+  analytics     Json?
+  
+  createdAt     DateTime   @default(now())
+}
+
+
+enum Role {
+  USER
+  ADMIN
+}
