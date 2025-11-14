@@ -73,15 +73,44 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Remove the unused generateLink call
+    // Auto-login user after registration: sign in with the provided credentials
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (sessionError || !sessionData.session) {
+      // If auto-login fails, still return user but without session tokens
+      // User can login manually afterward
+      console.warn("Auto-login after registration failed:", sessionError);
+      return res.status(201).json({
+        success: true,
+        message: "User registered successfully. Please login to continue.",
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          role: user.role,
+        },
+      });
+    }
+
+    // Registration successful with auto-login
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "User registered and logged in successfully",
       user: {
         id: user.id,
         email: user.email,
         displayName: user.displayName,
         role: user.role,
+      },
+      session: {
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
+        expires_at: sessionData.session.expires_at,
+        expires_in: sessionData.session.expires_in,
       },
     });
   } catch (err) {
@@ -188,36 +217,157 @@ export const login = async (req: Request, res: Response) => {
 // Existing syncUser function
 export const syncUser = async (req: Request, res: Response) => {
   try {
-    const { sub: userId, email, user_metadata } = req.user!;
+    const user = req.user;
+    if (!user || !user.sub) {
+      throw new ErrorHandler("User not authenticated", 401);
+    }
 
-    const displayName = user_metadata?.full_name || user_metadata?.name;
-    const avatarUrl = user_metadata?.avatar_url || null;
+    const userId = user.sub;
+    const userEmail = user.email || null;
+    const displayName = (user.user_metadata?.full_name as string | undefined) || 
+                       (user.user_metadata?.name as string | undefined) || 
+                       userEmail?.split("@")[0] || 
+                       null;
+    const avatarUrl = (user.user_metadata?.avatar_url as string | undefined) || null;
+    const gender = (user.user_metadata?.gender as string | undefined) || "female";
 
-    const user = await prisma.user.upsert({
+    const updatedUser = await prisma.user.upsert({
       where: { id: userId },
-      update: { email, displayName, avatarUrl },
+      update: { 
+        email: userEmail,
+        displayName, 
+        avatarUrl 
+      },
       create: {
         id: userId,
-        email,
+        email: userEmail,
         displayName,
         avatarUrl,
       },
       include: { profile: true },
     });
 
-    if (!user.profile) {
+    if (!updatedUser.profile) {
       await prisma.userProfile.create({
         data: {
           userId,
-          gender: user_metadata?.gender || "female",
+          gender,
         },
       });
     }
 
-    res.json({ message: "User synced successfully", user });
+    res.json({ 
+      success: true,
+      message: "User synced successfully", 
+      user: updatedUser 
+    });
   } catch (err) {
-    console.error("Sync Error:", err);
-    res.status(500).json({ error: "Failed to sync user" });
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Failed to sync user",
+      500
+    );
+  }
+};
+
+// Refresh access token using refresh token
+export const refreshToken = async (req: Request, res: Response) => {
+  try {
+    const { refresh_token } = req.body;
+
+    if (!refresh_token) {
+      throw new ErrorHandler("Refresh token is required", 400);
+    }
+
+    // Use Supabase to refresh the session
+    const { data, error } = await supabaseClient.auth.refreshSession({
+      refresh_token,
+    });
+
+    console.log("Refresh token response:", { data, error }, refresh_token);
+
+    if (error || !data.session) {
+      throw new ErrorHandler("Failed to refresh token", 401);
+    }
+    
+
+    res.json({
+      success: true,
+      message: "Token refreshed successfully",
+      session: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        expires_in: data.session.expires_in,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Token refresh failed",
+      500
+    );
+  }
+};
+
+// Logout user (invalidate session in Supabase)
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user || !user.sub) {
+      throw new ErrorHandler("User not authenticated", 401);
+    }
+
+    // Supabase doesn't support server-side token revocation directly.
+    // Tokens remain valid until they expire (security trade-off).
+    // For enhanced security, implement a token blacklist in your database.
+    
+    // Example audit logging (future enhancement):
+    // const userId = user.sub;
+    // await logAuditEvent(userId, 'LOGOUT', req.ip);
+
+    res.json({
+      success: true,
+      message: "Logged out successfully. Clear tokens from client storage.",
+    });
+  } catch (err) {
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Logout failed",
+      500
+    );
+  }
+};
+
+// Verify email (for email confirmation flow)
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      throw new ErrorHandler("Verification token is required", 400);
+    }
+
+    // Verify the token via Supabase (this is typically handled client-side or via email link)
+    // For now, we'll just acknowledge the endpoint exists
+    res.json({
+      success: true,
+      message: "Email verification handled. Please confirm via email link.",
+    });
+  } catch (err) {
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Email verification failed",
+      500
+    );
   }
 };
 

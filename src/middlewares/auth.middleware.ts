@@ -1,14 +1,21 @@
-// src/middlewares/verifySupabaseToken.ts
+// src/middlewares/auth.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-interface SupabaseUserPayload {
+export interface SupabaseUserPayload {
   sub: string;
   email?: string;
   user_metadata?: Record<string, unknown>;
 }
 
-// Note: We avoid global namespace augmentation to satisfy lint rules.
+// Extend Express Request to include Supabase user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: SupabaseUserPayload;
+    }
+  }
+}
 
 export const verifySupabaseToken = (
   req: Request,
@@ -37,8 +44,7 @@ export const verifySupabaseToken = (
       process.env.SUPABASE_JWT_SECRET as string
     ) as SupabaseUserPayload;
 
-    const reqWithUser = req as unknown as { user?: unknown };
-    reqWithUser.user = decoded as unknown;
+    req.user = decoded;
     next();
   } catch (err) {
     console.error("JWT Error:", err);
@@ -48,3 +54,6 @@ export const verifySupabaseToken = (
     });
   }
 };
+
+// Alias for backward compatibility
+export const authMiddleware = verifySupabaseToken;

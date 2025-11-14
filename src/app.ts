@@ -6,6 +6,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.route";
 import cycleRoutes from "./routes/cycle.route";
+import foodRoutes from "./routes/food.route";
 import profileRoutes from "./routes/profile.route";
 import prisma from "./lib/prismaClient";
 
@@ -36,6 +37,7 @@ app.use(morgan("dev"));
 app.use("/api/auth", authRoutes);
 app.use("/api/cycle", cycleRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/food", foodRoutes);
 
 
 app.get("/", (req, res) => {

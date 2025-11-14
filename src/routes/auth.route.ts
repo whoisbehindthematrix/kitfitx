@@ -1,16 +1,22 @@
-import express from "express";
-import { verifySupabaseToken } from "../middlewares/auth.middleware";
-import { register, login, syncUser, getAllUsers } from "../controllers/auth.controller";
+import { Router } from "express";
+import { register, login, refreshToken, logout } from "../controllers/auth.controller";
 import { TryCatch } from "../middlewares/error";
+import { authMiddleware } from "../middlewares/auth.middleware";
 
-const router = express.Router();
+const router = Router();
 
 // Public routes
 router.post("/register", TryCatch(register));
 router.post("/login", TryCatch(login));
+router.post("/token/refresh", TryCatch(refreshToken));
+router.post("/logout", TryCatch(logout));
 
-// Protected routes (require Supabase token)
-router.post("/sync", verifySupabaseToken, TryCatch(syncUser));
-router.get("/admin/users", verifySupabaseToken, TryCatch(getAllUsers));
+// Protected route example
+router.get("/me", authMiddleware, TryCatch(async (req, res) => {
+  res.json({
+    success: true,
+    user: req.user
+  });
+}));
 
 export default router;

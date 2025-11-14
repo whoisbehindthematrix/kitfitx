@@ -4,7 +4,7 @@
    "description": "",
    "main": "dist/app.js",
    "scripts": {
-      "start": "set NODE_ENV=PRODUCTION & node dist/app.js",
+      "start": "NODE_ENV=production node dist/app.js",
       "build": "prisma generate && npm run lint && tsc -p . && tsc-alias",
       "dev": "prisma generate && tsx watch src/app.ts",
       "lint": "eslint src",
@@ -20,6 +20,7 @@
    "type": "module",
    "license": "ISC",
    "dependencies": {
+      "@google/generative-ai": "^0.24.1",
       "@prisma/client": "^6.18.0",
       "@supabase/supabase-js": "^2.78.0",
       "bcryptjs": "^3.0.3",
@@ -30,6 +31,7 @@
       "jsonwebtoken": "^9.0.2",
       "jwk-to-pem": "^2.0.7",
       "morgan": "1.10.1",
+      "multer": "^2.0.2",
       "node-fetch": "^3.3.2",
       "zod": "^4.1.12"
    },
@@ -41,6 +43,7 @@
       "@types/helmet": "4.0.0",
       "@types/jsonwebtoken": "^9.0.10",
       "@types/morgan": "1.9.10",
+      "@types/multer": "^2.0.0",
       "@types/node": "24.8.1",
       "eslint": "9.38.0",
       "globals": "16.4.0",
