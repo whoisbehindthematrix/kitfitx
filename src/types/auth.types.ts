@@ -1,4 +1,3 @@
-import { User } from '../generated/prisma';
 
 export interface RegisterUserInput {
   email: string;
@@ -24,10 +23,16 @@ export interface JWTPayload {
 }
 
 // Extend Express Request type to include authenticated user
+export interface SupabaseUserPayload {
+  sub: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}
+
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: SupabaseUserPayload;
     }
   }
 }

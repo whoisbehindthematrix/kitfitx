@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prismaClient";
 import { cycleEntrySchema } from "../validation/cycleSchemas.validation";
+import { ZodError } from "zod";
 
 export const addCycleEntry = async (req: Request, res: Response) => {
   try {
@@ -13,15 +14,15 @@ export const addCycleEntry = async (req: Request, res: Response) => {
         date: new Date(parsed.date),
         isPeriod: parsed.isPeriod,
         flowIntensity: parsed.flowIntensity,
-        symptoms: parsed.symptoms,
+  symptoms: parsed.symptoms ? JSON.parse(JSON.stringify(parsed.symptoms)) : undefined,
         notes: parsed.notes,
       },
     });
 
     res.json(entry);
-  } catch (err) {
-    if (err.name === "ZodError") {
-      return res.status(400).json({ error: err.errors });
+  } catch (err: unknown) {
+    if (err instanceof ZodError) {
+      return res.status(400).json({ error: err.issues });
     }
     console.error(err);
     res.status(500).json({ error: "Failed to add cycle entry" });
@@ -36,7 +37,8 @@ export const getCycleEntries = async (req: Request, res: Response) => {
       orderBy: { date: "desc" },
     });
     res.json(entries);
-  } catch (err) {
+  } catch (err: unknown) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch entries" });
   }
 };

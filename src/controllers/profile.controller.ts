@@ -14,7 +14,7 @@ export const upsertProfile = async (req: Request, res: Response) => {
   const parseResult = updateProfileSchema.safeParse(req.body);
   if (!parseResult.success) {
     throw new ErrorHandler(
-      "Invalid profile payload: " + parseResult.error.errors.map(e => e.message).join(", "),
+      "Invalid profile payload: " + parseResult.error.issues.map((e: { message: string }) => e.message).join(", "),
       400
     );
   }

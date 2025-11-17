@@ -1,0 +1,8 @@
+import { z } from "zod";
+export const cycleEntrySchema = z.object({
+    date: z.string().datetime(),
+    isPeriod: z.boolean(),
+    flowIntensity: z.enum(["light", "medium", "heavy", "spotting"]).optional(),
+    symptoms: z.record(z.string(), z.any()).optional(),
+    notes: z.string().optional(),
+});

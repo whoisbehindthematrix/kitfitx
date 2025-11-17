@@ -50,13 +50,15 @@ export const register = async (req: Request, res: Response) => {
       where: { id: userId },
       update: {
         email: userEmail,
-        displayName: displayName || authData.user.user_metadata?.full_name || null,
+        displayName:
+          displayName || authData.user.user_metadata?.full_name || null,
         avatarUrl: authData.user.user_metadata?.avatar_url || null,
       },
       create: {
         id: userId,
         email: userEmail,
-        displayName: displayName || authData.user.user_metadata?.full_name || null,
+        displayName:
+          displayName || authData.user.user_metadata?.full_name || null,
         avatarUrl: authData.user.user_metadata?.avatar_url || null,
         role: "USER", // Ensure this matches the Role enum exactly
       },
@@ -216,60 +218,61 @@ export const login = async (req: Request, res: Response) => {
 
 // Existing syncUser function
 export const syncUser = async (req: Request, res: Response) => {
-  try {
-    const user = req.user;
-    if (!user || !user.sub) {
-      throw new ErrorHandler("User not authenticated", 401);
-    }
+	try {
+		const user = req.user;
+		if (!user || !user.sub) {
+			throw new ErrorHandler('User not authenticated', 401);
+		}
 
-    const userId = user.sub;
-    const userEmail = user.email || null;
-    const displayName = (user.user_metadata?.full_name as string | undefined) || 
-                       (user.user_metadata?.name as string | undefined) || 
-                       userEmail?.split("@")[0] || 
-                       null;
-    const avatarUrl = (user.user_metadata?.avatar_url as string | undefined) || null;
-    const gender = (user.user_metadata?.gender as string | undefined) || "female";
+		const userId = user.sub;
+		const userEmail = user.email || null;
 
-    const updatedUser = await prisma.user.upsert({
-      where: { id: userId },
-      update: { 
-        email: userEmail,
-        displayName, 
-        avatarUrl 
-      },
-      create: {
-        id: userId,
-        email: userEmail,
-        displayName,
-        avatarUrl,
-      },
-      include: { profile: true },
-    });
+		const displayName =
+			(user.user_metadata?.full_name as string | undefined) ||
+			(user.user_metadata?.name as string | undefined) ||
+			(userEmail?.split('@')[0] ?? null);
 
-    if (!updatedUser.profile) {
-      await prisma.userProfile.create({
-        data: {
-          userId,
-          gender,
-        },
-      });
-    }
+		const avatarUrl = (user.user_metadata?.avatar_url as string | undefined) || null;
+		const gender = (user.user_metadata?.gender as string | undefined) || 'female';
 
-    res.json({ 
-      success: true,
-      message: "User synced successfully", 
-      user: updatedUser 
-    });
-  } catch (err) {
-    if (err instanceof ErrorHandler) {
-      throw err;
-    }
-    throw new ErrorHandler(
-      err instanceof Error ? err.message : "Failed to sync user",
-      500
-    );
-  }
+		// Upsert user (no nested profile to keep it clear)
+		await prisma.user.upsert({
+			where: { id: userId },
+			update: { email: userEmail, displayName, avatarUrl },
+			create: { id: userId, email: userEmail, displayName, avatarUrl },
+		});
+
+		// Ensure profile exists
+		const existingProfile = await prisma.userProfile.findUnique({ where: { userId } });
+		if (!existingProfile) {
+			await prisma.userProfile.create({ data: { userId, gender } });
+		}
+
+		// Refetch user with profile for accurate response
+		const fullUser = await prisma.user.findUnique({
+			where: { id: userId },
+			include: { profile: true },
+		});
+		if (!fullUser) throw new ErrorHandler('User not found after sync', 500);
+
+		return res.json({
+			success: true,
+			message: 'User synced successfully',
+			user: {
+				id: fullUser.id,
+				email: fullUser.email,
+				displayName: fullUser.displayName,
+				avatarUrl: fullUser.avatarUrl,
+				profile: fullUser.profile, // matches app expectation
+			},
+		});
+	} catch (err) {
+		if (err instanceof ErrorHandler) throw err;
+		throw new ErrorHandler(
+			err instanceof Error ? err.message : 'Failed to sync user',
+			500
+		);
+	}
 };
 
 // Refresh access token using refresh token
@@ -291,7 +294,6 @@ export const refreshToken = async (req: Request, res: Response) => {
     if (error || !data.session) {
       throw new ErrorHandler("Failed to refresh token", 401);
     }
-    
 
     res.json({
       success: true,
@@ -325,7 +327,7 @@ export const logout = async (req: Request, res: Response) => {
     // Supabase doesn't support server-side token revocation directly.
     // Tokens remain valid until they expire (security trade-off).
     // For enhanced security, implement a token blacklist in your database.
-    
+
     // Example audit logging (future enhancement):
     // const userId = user.sub;
     // await logAuditEvent(userId, 'LOGOUT', req.ip);
