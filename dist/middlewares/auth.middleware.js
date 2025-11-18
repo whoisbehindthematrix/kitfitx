@@ -1,13 +1,16 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
-const JWKS = createRemoteJWKSet(new URL(process.env.SUPABASE_JWT_KEY));
-export async function authMiddleware(req, res, next) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.authMiddleware = authMiddleware;
+const jose_1 = require("jose");
+const JWKS = (0, jose_1.createRemoteJWKSet)(new URL(process.env.SUPABASE_JWT_KEY));
+async function authMiddleware(req, res, next) {
     try {
         const header = (req.headers.authorization ?? "");
         const token = header.replace("Bearer ", "");
         console.log("Auth Middleware - Token:", token, JWKS);
         if (!token)
             return res.status(401).json({ error: "Missing token" });
-        const { payload } = (await jwtVerify(token, JWKS));
+        const { payload } = (await (0, jose_1.jwtVerify)(token, JWKS));
         req.user = {
             sub: payload.sub,
             email: payload.email,

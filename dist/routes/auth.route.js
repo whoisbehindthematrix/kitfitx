@@ -1,19 +1,21 @@
-import { Router } from "express";
-import { register, login, refreshToken, logout, syncUser } from "../controllers/auth.controller";
-import { TryCatch } from "../middlewares/error";
-import { authMiddleware } from "../middlewares/auth.middleware";
-const router = Router();
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_controller_1 = require("../controllers/auth.controller");
+const error_1 = require("../middlewares/error");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const router = (0, express_1.Router)();
 // Public routes
-router.post("/register", TryCatch(register));
-router.post("/login", TryCatch(login));
-router.post("/token/refresh", TryCatch(refreshToken));
-router.post("/logout", TryCatch(logout));
+router.post("/register", (0, error_1.TryCatch)(auth_controller_1.register));
+router.post("/login", (0, error_1.TryCatch)(auth_controller_1.login));
+router.post("/token/refresh", (0, error_1.TryCatch)(auth_controller_1.refreshToken));
+router.post("/logout", (0, error_1.TryCatch)(auth_controller_1.logout));
 // Protected route example
-router.post("/sync", authMiddleware, TryCatch(syncUser));
-router.get("/me", authMiddleware, TryCatch(async (req, res) => {
+router.post("/sync", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(auth_controller_1.syncUser));
+router.get("/me", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(async (req, res) => {
     res.json({
         success: true,
         user: req.user
     });
 }));
-export default router;
+exports.default = router;

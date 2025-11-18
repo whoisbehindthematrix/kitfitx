@@ -1,11 +1,17 @@
-import prisma from "../lib/prismaClient";
-import { cycleEntrySchema } from "../validation/cycleSchemas.validation";
-import { ZodError } from "zod";
-export const addCycleEntry = async (req, res) => {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getCycleEntries = exports.addCycleEntry = void 0;
+const prismaClient_js_1 = __importDefault(require("../lib/prismaClient.js"));
+const cycleSchemas_validation_js_1 = require("../validation/cycleSchemas.validation.js");
+const zod_1 = require("zod");
+const addCycleEntry = async (req, res) => {
     try {
-        const parsed = cycleEntrySchema.parse(req.body);
+        const parsed = cycleSchemas_validation_js_1.cycleEntrySchema.parse(req.body);
         const userId = req.user?.sub;
-        const entry = await prisma.cycleEntry.create({
+        const entry = await prismaClient_js_1.default.cycleEntry.create({
             data: {
                 userId: userId,
                 date: new Date(parsed.date),
@@ -18,17 +24,18 @@ export const addCycleEntry = async (req, res) => {
         res.json(entry);
     }
     catch (err) {
-        if (err instanceof ZodError) {
+        if (err instanceof zod_1.ZodError) {
             return res.status(400).json({ error: err.issues });
         }
         console.error(err);
         res.status(500).json({ error: "Failed to add cycle entry" });
     }
 };
-export const getCycleEntries = async (req, res) => {
+exports.addCycleEntry = addCycleEntry;
+const getCycleEntries = async (req, res) => {
     try {
         const userId = req.user?.sub;
-        const entries = await prisma.cycleEntry.findMany({
+        const entries = await prismaClient_js_1.default.cycleEntry.findMany({
             where: { userId },
             orderBy: { date: "desc" },
         });
@@ -39,3 +46,4 @@ export const getCycleEntries = async (req, res) => {
         res.status(500).json({ error: "Failed to fetch entries" });
     }
 };
+exports.getCycleEntries = getCycleEntries;

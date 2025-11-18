@@ -1,19 +1,25 @@
-import prisma from "../lib/prismaClient";
-import { createClient } from "@supabase/supabase-js";
-import ErrorHandler from "../utils/errorHandler.js";
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getAllUsers = exports.verifyEmail = exports.logout = exports.refreshToken = exports.syncUser = exports.login = exports.register = void 0;
+const prismaClient_1 = __importDefault(require("../lib/prismaClient"));
+const supabase_js_1 = require("@supabase/supabase-js");
+const errorHandler_js_1 = __importDefault(require("../utils/errorHandler.js"));
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // For admin operations
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY; // For client operations
 // Admin client (has service role key - bypasses RLS)
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAdmin = (0, supabase_js_1.createClient)(supabaseUrl, supabaseServiceKey);
 // Public client (for regular operations)
-const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-export const register = async (req, res) => {
+const supabaseClient = (0, supabase_js_1.createClient)(supabaseUrl, supabaseAnonKey);
+const register = async (req, res) => {
     try {
         const { email, password, displayName } = req.body;
         if (!email || !password) {
-            throw new ErrorHandler("Email and password are required", 400);
+            throw new errorHandler_js_1.default("Email and password are required", 400);
         }
         // Register user in Supabase Auth
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -25,16 +31,16 @@ export const register = async (req, res) => {
             },
         });
         if (authError) {
-            throw new ErrorHandler(authError.message || "Registration failed", 400);
+            throw new errorHandler_js_1.default(authError.message || "Registration failed", 400);
         }
         if (!authData.user) {
-            throw new ErrorHandler("Failed to create user", 500);
+            throw new errorHandler_js_1.default("Failed to create user", 500);
         }
         // Ensure the ID is a string and role matches enum
         const userId = String(authData.user.id);
         const userEmail = authData.user.email || email;
         // Sync user to your database
-        const user = await prisma.user.upsert({
+        const user = await prismaClient_1.default.user.upsert({
             where: { id: userId },
             update: {
                 email: userEmail,
@@ -52,7 +58,7 @@ export const register = async (req, res) => {
         });
         // Create profile if it doesn't exist
         if (!user.profile) {
-            await prisma.userProfile.create({
+            await prismaClient_1.default.userProfile.create({
                 data: {
                     userId: user.id,
                     gender: authData.user.user_metadata?.gender || "female",
@@ -98,19 +104,20 @@ export const register = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler) {
+        if (err instanceof errorHandler_js_1.default) {
             throw err;
         }
         // Ensure proper error handling
-        throw new ErrorHandler(err instanceof Error ? err.message : "Registration failed", 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Registration failed", 500);
     }
 };
+exports.register = register;
 // Login user - similar fixes
-export const login = async (req, res) => {
+const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
-            throw new ErrorHandler("Email and password are required", 400);
+            throw new errorHandler_js_1.default("Email and password are required", 400);
         }
         // Sign in with Supabase
         const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
@@ -118,16 +125,16 @@ export const login = async (req, res) => {
             password,
         });
         if (authError) {
-            throw new ErrorHandler(authError.message || "Invalid credentials", 401);
+            throw new errorHandler_js_1.default(authError.message || "Invalid credentials", 401);
         }
         if (!authData.user || !authData.session) {
-            throw new ErrorHandler("Login failed", 500);
+            throw new errorHandler_js_1.default("Login failed", 500);
         }
         // Ensure proper data types
         const userId = String(authData.user.id);
         const userEmail = authData.user.email || email;
         // Sync user to your database
-        const user = await prisma.user.upsert({
+        const user = await prismaClient_1.default.user.upsert({
             where: { id: userId },
             update: {
                 email: userEmail,
@@ -149,7 +156,7 @@ export const login = async (req, res) => {
         });
         // Create profile if it doesn't exist
         if (!user.profile) {
-            await prisma.userProfile.create({
+            await prismaClient_1.default.userProfile.create({
                 data: {
                     userId: user.id,
                     gender: authData.user.user_metadata?.gender || "female",
@@ -174,18 +181,19 @@ export const login = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler) {
+        if (err instanceof errorHandler_js_1.default) {
             throw err;
         }
-        throw new ErrorHandler(err instanceof Error ? err.message : "Login failed", 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Login failed", 500);
     }
 };
+exports.login = login;
 // Existing syncUser function
-export const syncUser = async (req, res) => {
+const syncUser = async (req, res) => {
     try {
         const user = req.user;
         if (!user || !user.sub) {
-            throw new ErrorHandler('User not authenticated', 401);
+            throw new errorHandler_js_1.default('User not authenticated', 401);
         }
         const userId = user.sub;
         const userEmail = user.email || null;
@@ -195,23 +203,23 @@ export const syncUser = async (req, res) => {
         const avatarUrl = user.user_metadata?.avatar_url || null;
         const gender = user.user_metadata?.gender || 'female';
         // Upsert user (no nested profile to keep it clear)
-        await prisma.user.upsert({
+        await prismaClient_1.default.user.upsert({
             where: { id: userId },
             update: { email: userEmail, displayName, avatarUrl },
             create: { id: userId, email: userEmail, displayName, avatarUrl },
         });
         // Ensure profile exists
-        const existingProfile = await prisma.userProfile.findUnique({ where: { userId } });
+        const existingProfile = await prismaClient_1.default.userProfile.findUnique({ where: { userId } });
         if (!existingProfile) {
-            await prisma.userProfile.create({ data: { userId, gender } });
+            await prismaClient_1.default.userProfile.create({ data: { userId, gender } });
         }
         // Refetch user with profile for accurate response
-        const fullUser = await prisma.user.findUnique({
+        const fullUser = await prismaClient_1.default.user.findUnique({
             where: { id: userId },
             include: { profile: true },
         });
         if (!fullUser)
-            throw new ErrorHandler('User not found after sync', 500);
+            throw new errorHandler_js_1.default('User not found after sync', 500);
         return res.json({
             success: true,
             message: 'User synced successfully',
@@ -225,17 +233,18 @@ export const syncUser = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler)
+        if (err instanceof errorHandler_js_1.default)
             throw err;
-        throw new ErrorHandler(err instanceof Error ? err.message : 'Failed to sync user', 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : 'Failed to sync user', 500);
     }
 };
+exports.syncUser = syncUser;
 // Refresh access token using refresh token
-export const refreshToken = async (req, res) => {
+const refreshToken = async (req, res) => {
     try {
         const { refresh_token } = req.body;
         if (!refresh_token) {
-            throw new ErrorHandler("Refresh token is required", 400);
+            throw new errorHandler_js_1.default("Refresh token is required", 400);
         }
         // Use Supabase to refresh the session
         const { data, error } = await supabaseClient.auth.refreshSession({
@@ -243,7 +252,7 @@ export const refreshToken = async (req, res) => {
         });
         console.log("Refresh token response:", { data, error }, refresh_token);
         if (error || !data.session) {
-            throw new ErrorHandler("Failed to refresh token", 401);
+            throw new errorHandler_js_1.default("Failed to refresh token", 401);
         }
         res.json({
             success: true,
@@ -257,18 +266,19 @@ export const refreshToken = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler) {
+        if (err instanceof errorHandler_js_1.default) {
             throw err;
         }
-        throw new ErrorHandler(err instanceof Error ? err.message : "Token refresh failed", 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Token refresh failed", 500);
     }
 };
+exports.refreshToken = refreshToken;
 // Logout user (invalidate session in Supabase)
-export const logout = async (req, res) => {
+const logout = async (req, res) => {
     try {
         const user = req.user;
         if (!user || !user.sub) {
-            throw new ErrorHandler("User not authenticated", 401);
+            throw new errorHandler_js_1.default("User not authenticated", 401);
         }
         // Supabase doesn't support server-side token revocation directly.
         // Tokens remain valid until they expire (security trade-off).
@@ -282,18 +292,19 @@ export const logout = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler) {
+        if (err instanceof errorHandler_js_1.default) {
             throw err;
         }
-        throw new ErrorHandler(err instanceof Error ? err.message : "Logout failed", 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Logout failed", 500);
     }
 };
+exports.logout = logout;
 // Verify email (for email confirmation flow)
-export const verifyEmail = async (req, res) => {
+const verifyEmail = async (req, res) => {
     try {
         const { token } = req.body;
         if (!token) {
-            throw new ErrorHandler("Verification token is required", 400);
+            throw new errorHandler_js_1.default("Verification token is required", 400);
         }
         // Verify the token via Supabase (this is typically handled client-side or via email link)
         // For now, we'll just acknowledge the endpoint exists
@@ -303,30 +314,31 @@ export const verifyEmail = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler) {
+        if (err instanceof errorHandler_js_1.default) {
             throw err;
         }
-        throw new ErrorHandler(err instanceof Error ? err.message : "Email verification failed", 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Email verification failed", 500);
     }
 };
+exports.verifyEmail = verifyEmail;
 // Admin: Get all users
-export const getAllUsers = async (req, res) => {
+const getAllUsers = async (req, res) => {
     try {
         // Check if user is admin (from middleware)
         const { sub: userId } = req.user;
-        const currentUser = await prisma.user.findUnique({
+        const currentUser = await prismaClient_1.default.user.findUnique({
             where: { id: userId },
             select: { role: true },
         });
         if (!currentUser || currentUser.role !== "ADMIN") {
-            throw new ErrorHandler("Unauthorized: Admin access required", 403);
+            throw new errorHandler_js_1.default("Unauthorized: Admin access required", 403);
         }
         // Get all users with pagination
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         const [users, total] = await Promise.all([
-            prisma.user.findMany({
+            prismaClient_1.default.user.findMany({
                 skip,
                 take: limit,
                 select: {
@@ -349,7 +361,7 @@ export const getAllUsers = async (req, res) => {
                     createdAt: "desc",
                 },
             }),
-            prisma.user.count(),
+            prismaClient_1.default.user.count(),
         ]);
         res.json({
             success: true,
@@ -363,9 +375,10 @@ export const getAllUsers = async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof ErrorHandler) {
+        if (err instanceof errorHandler_js_1.default) {
             throw err;
         }
-        throw new ErrorHandler(err instanceof Error ? err.message : "Failed to fetch users", 500);
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Failed to fetch users", 500);
     }
 };
+exports.getAllUsers = getAllUsers;

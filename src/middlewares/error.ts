@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import ErrorHandler from "@/utils/errorHandler.js";
 import { envMode } from "@/app.js";
-import { Prisma } from "../generated/prisma";
+import { Prisma } from "@prisma/client";
 
 export const errorMiddleware = (
   err: Error | ErrorHandler | Prisma.PrismaClientKnownRequestError,

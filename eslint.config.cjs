@@ -1,10 +1,9 @@
-
-import globals from "globals";
-import pluginJs from "@eslint/js";
-import tseslint from "typescript-eslint";
+const globals = require("globals");
+const pluginJs = require("@eslint/js");
+const tseslint = require("typescript-eslint");
 
 /** @type {import('eslint').Linter.Config[]} */
-export default [
+module.exports = [
   {
     ignores: ["**/node_modules/**", "dist/**", "src/generated/**"],
   },

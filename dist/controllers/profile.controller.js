@@ -1,25 +1,31 @@
-import prisma from "../lib/prismaClient";
-import { updateProfileSchema } from "../validation/profileSchemas.validation";
-import ErrorHandler from "../utils/errorHandler.js";
-export const upsertProfile = async (req, res) => {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getProfile = exports.upsertProfile = void 0;
+const prismaClient_js_1 = __importDefault(require("../lib/prismaClient.js"));
+const profileSchemas_validation_js_1 = require("../validation/profileSchemas.validation.js");
+const errorHandler_js_1 = __importDefault(require("../utils/errorHandler.js"));
+const upsertProfile = async (req, res) => {
     // Parse and validate incoming profile fields
-    const parseResult = updateProfileSchema.safeParse(req.body);
+    const parseResult = profileSchemas_validation_js_1.updateProfileSchema.safeParse(req.body);
     if (!parseResult.success) {
-        throw new ErrorHandler("Invalid profile payload: " + parseResult.error.issues.map((e) => e.message).join(", "), 400);
+        throw new errorHandler_js_1.default("Invalid profile payload: " + parseResult.error.issues.map((e) => e.message).join(", "), 400);
     }
     const profileData = parseResult.data;
     const authUser = req.user;
     if (!authUser?.sub) {
-        throw new ErrorHandler("Unauthorized", 401);
+        throw new errorHandler_js_1.default("Unauthorized", 401);
     }
     const userId = authUser.sub;
     // Ensure base user exists (will throw if not)
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prismaClient_js_1.default.user.findUnique({ where: { id: userId } });
     if (!user) {
-        throw new ErrorHandler("User not found", 404);
+        throw new errorHandler_js_1.default("User not found", 404);
     }
     // Upsert by unique userId
-    const profile = await prisma.userProfile.upsert({
+    const profile = await prismaClient_js_1.default.userProfile.upsert({
         where: { userId },
         update: { ...profileData },
         create: { userId, ...profileData },
@@ -30,13 +36,14 @@ export const upsertProfile = async (req, res) => {
         data: profile,
     });
 };
-export const getProfile = async (req, res) => {
+exports.upsertProfile = upsertProfile;
+const getProfile = async (req, res) => {
     const authUser = req.user;
     if (!authUser?.sub) {
-        throw new ErrorHandler("Unauthorized", 401);
+        throw new errorHandler_js_1.default("Unauthorized", 401);
     }
     const userId = authUser.sub;
-    const profile = await prisma.userProfile.findUnique({
+    const profile = await prismaClient_js_1.default.userProfile.findUnique({
         where: { userId },
     });
     if (!profile) {
@@ -51,3 +58,4 @@ export const getProfile = async (req, res) => {
         data: profile,
     });
 };
+exports.getProfile = getProfile;
