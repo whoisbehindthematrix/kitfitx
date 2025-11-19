@@ -4,14 +4,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCycleEntries = exports.addCycleEntry = void 0;
-const prismaClient_js_1 = __importDefault(require("../lib/prismaClient.js"));
-const cycleSchemas_validation_js_1 = require("../validation/cycleSchemas.validation.js");
+const prismaClient_1 = __importDefault(require("../lib/prismaClient"));
+const cycleSchemas_validation_1 = require("../validation/cycleSchemas.validation");
 const zod_1 = require("zod");
 const addCycleEntry = async (req, res) => {
     try {
-        const parsed = cycleSchemas_validation_js_1.cycleEntrySchema.parse(req.body);
+        const parsed = cycleSchemas_validation_1.cycleEntrySchema.parse(req.body);
         const userId = req.user?.sub;
-        const entry = await prismaClient_js_1.default.cycleEntry.create({
+        const entry = await prismaClient_1.default.cycleEntry.create({
             data: {
                 userId: userId,
                 date: new Date(parsed.date),
@@ -35,7 +35,7 @@ exports.addCycleEntry = addCycleEntry;
 const getCycleEntries = async (req, res) => {
     try {
         const userId = req.user?.sub;
-        const entries = await prismaClient_js_1.default.cycleEntry.findMany({
+        const entries = await prismaClient_1.default.cycleEntry.findMany({
             where: { userId },
             orderBy: { date: "desc" },
         });

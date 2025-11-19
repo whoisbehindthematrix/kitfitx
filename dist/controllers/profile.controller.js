@@ -4,12 +4,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getProfile = exports.upsertProfile = void 0;
-const prismaClient_js_1 = __importDefault(require("../lib/prismaClient.js"));
-const profileSchemas_validation_js_1 = require("../validation/profileSchemas.validation.js");
+const prismaClient_1 = __importDefault(require("../lib/prismaClient"));
+const profileSchemas_validation_1 = require("../validation/profileSchemas.validation");
 const errorHandler_js_1 = __importDefault(require("../utils/errorHandler.js"));
 const upsertProfile = async (req, res) => {
     // Parse and validate incoming profile fields
-    const parseResult = profileSchemas_validation_js_1.updateProfileSchema.safeParse(req.body);
+    const parseResult = profileSchemas_validation_1.updateProfileSchema.safeParse(req.body);
     if (!parseResult.success) {
         throw new errorHandler_js_1.default("Invalid profile payload: " + parseResult.error.issues.map((e) => e.message).join(", "), 400);
     }
@@ -20,12 +20,12 @@ const upsertProfile = async (req, res) => {
     }
     const userId = authUser.sub;
     // Ensure base user exists (will throw if not)
-    const user = await prismaClient_js_1.default.user.findUnique({ where: { id: userId } });
+    const user = await prismaClient_1.default.user.findUnique({ where: { id: userId } });
     if (!user) {
         throw new errorHandler_js_1.default("User not found", 404);
     }
     // Upsert by unique userId
-    const profile = await prismaClient_js_1.default.userProfile.upsert({
+    const profile = await prismaClient_1.default.userProfile.upsert({
         where: { userId },
         update: { ...profileData },
         create: { userId, ...profileData },
@@ -43,7 +43,7 @@ const getProfile = async (req, res) => {
         throw new errorHandler_js_1.default("Unauthorized", 401);
     }
     const userId = authUser.sub;
-    const profile = await prismaClient_js_1.default.userProfile.findUnique({
+    const profile = await prismaClient_1.default.userProfile.findUnique({
         where: { userId },
     });
     if (!profile) {
