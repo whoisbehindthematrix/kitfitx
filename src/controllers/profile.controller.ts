@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prismaClient";
+import { Prisma } from "@prisma/client"; // Add this import
 import { updateProfileSchema } from "../validation/profileSchemas.validation";
 import ErrorHandler from "@/utils/errorHandler.js";
 
@@ -34,11 +35,34 @@ export const upsertProfile = async (req: Request, res: Response) => {
     throw new ErrorHandler("User not found", 404);
   }
 
+  // Prepare profile data for Prisma (handle dates and JSON fields)
+  const updateData: Record<string, unknown> = {};
+  
+  // Handle date fields
+  if (profileData.dateOfBirth) {
+    updateData.dateOfBirth = new Date(profileData.dateOfBirth);
+  }
+  if (profileData.lastPeriodStart) {
+    updateData.lastPeriodStart = new Date(profileData.lastPeriodStart);
+  }
+
+  // Copy other fields (excluding dates and JSON)
+  Object.entries(profileData).forEach(([key, value]) => {
+    if (key !== "dateOfBirth" && key !== "lastPeriodStart" && key !== "notifications" && value !== undefined) {
+      updateData[key] = value;
+    }
+  });
+
+  // Handle notifications JSON field separately
+  if (profileData.notifications !== undefined) {
+    updateData.notifications = profileData.notifications as Prisma.InputJsonValue;
+  }
+
   // Upsert by unique userId
   const profile = await prisma.userProfile.upsert({
     where: { userId },
-    update: { ...profileData },
-    create: { userId, ...profileData },
+    update: updateData,
+    create: { userId, ...updateData },
   });
 
   return res.status(200).json({
@@ -47,7 +71,6 @@ export const upsertProfile = async (req: Request, res: Response) => {
     data: profile,
   });
 };
-
 
 export const getProfile = async (req: Request, res: Response) => {
   const authUser = (req as unknown as { user?: { sub?: string } }).user;

@@ -24,11 +24,30 @@ const upsertProfile = async (req, res) => {
     if (!user) {
         throw new errorHandler_js_1.default("User not found", 404);
     }
+    // Prepare profile data for Prisma (handle dates and JSON fields)
+    const updateData = {};
+    // Handle date fields
+    if (profileData.dateOfBirth) {
+        updateData.dateOfBirth = new Date(profileData.dateOfBirth);
+    }
+    if (profileData.lastPeriodStart) {
+        updateData.lastPeriodStart = new Date(profileData.lastPeriodStart);
+    }
+    // Copy other fields (excluding dates and JSON)
+    Object.entries(profileData).forEach(([key, value]) => {
+        if (key !== "dateOfBirth" && key !== "lastPeriodStart" && key !== "notifications" && value !== undefined) {
+            updateData[key] = value;
+        }
+    });
+    // Handle notifications JSON field separately
+    if (profileData.notifications !== undefined) {
+        updateData.notifications = profileData.notifications;
+    }
     // Upsert by unique userId
     const profile = await prismaClient_1.default.userProfile.upsert({
         where: { userId },
-        update: { ...profileData },
-        create: { userId, ...profileData },
+        update: updateData,
+        create: { userId, ...updateData },
     });
     return res.status(200).json({
         success: true,

@@ -8,6 +8,9 @@ import authRoutes from "./routes/auth.route";
 import cycleRoutes from "./routes/cycle.route";
 import foodRoutes from "./routes/food.route";
 import profileRoutes from "./routes/profile.route";
+import onboardingRoutes from "./routes/onboarding.route";
+import { refreshToken } from "./controllers/auth.controller";
+import { TryCatch } from "./middlewares/error";
 import prisma from "./lib/prismaClient";
 
 dotenv.config({ path: "./.env" });
@@ -15,7 +18,7 @@ dotenv.config({ path: "./.env" });
 
 
 export const envMode = process.env.NODE_ENV?.trim() || "DEVELOPMENT";
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
 const app = express();
 
 app.use(
@@ -38,6 +41,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/cycle", cycleRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/food", foodRoutes);
+app.use("/api/onboarding", onboardingRoutes);
+
+// Token refresh route (also available at /api/token/refresh per frontend requirements)
+app.post("/api/token/refresh", TryCatch(refreshToken));
 
 
 app.get("/", (req, res) => {

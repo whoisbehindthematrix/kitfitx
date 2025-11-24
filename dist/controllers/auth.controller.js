@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllUsers = exports.verifyEmail = exports.logout = exports.refreshToken = exports.syncUser = exports.login = exports.register = void 0;
+exports.updateCurrentUser = exports.getCurrentUser = exports.getAllUsers = exports.verifyEmail = exports.logout = exports.refreshToken = exports.syncUser = exports.login = exports.register = void 0;
 const prismaClient_1 = __importDefault(require("../lib/prismaClient"));
 const supabase_js_1 = require("@supabase/supabase-js");
 const errorHandler_js_1 = __importDefault(require("../utils/errorHandler.js"));
+const profileSchemas_validation_js_1 = require("../validation/profileSchemas.validation.js");
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // For admin operations
@@ -65,6 +66,14 @@ const register = async (req, res) => {
                 },
             });
         }
+        // Refetch user with profile to get onboardingCompleted
+        const userWithProfile = await prismaClient_1.default.user.findUnique({
+            where: { id: user.id },
+            include: { profile: true },
+        });
+        if (!userWithProfile) {
+            throw new errorHandler_js_1.default("Failed to fetch user profile", 500);
+        }
         // Auto-login user after registration: sign in with the provided credentials
         const { data: sessionData, error: sessionError } = await supabaseClient.auth.signInWithPassword({
             email,
@@ -78,10 +87,11 @@ const register = async (req, res) => {
                 success: true,
                 message: "User registered successfully. Please login to continue.",
                 user: {
-                    id: user.id,
-                    email: user.email,
-                    displayName: user.displayName,
-                    role: user.role,
+                    id: userWithProfile.id,
+                    email: userWithProfile.email,
+                    displayName: userWithProfile.displayName,
+                    avatarUrl: userWithProfile.avatarUrl,
+                    onboardingCompleted: userWithProfile.profile?.onboardingCompleted ?? false,
                 },
             });
         }
@@ -90,10 +100,11 @@ const register = async (req, res) => {
             success: true,
             message: "User registered and logged in successfully",
             user: {
-                id: user.id,
-                email: user.email,
-                displayName: user.displayName,
-                role: user.role,
+                id: userWithProfile.id,
+                email: userWithProfile.email,
+                displayName: userWithProfile.displayName,
+                avatarUrl: userWithProfile.avatarUrl,
+                onboardingCompleted: userWithProfile.profile?.onboardingCompleted ?? false,
             },
             session: {
                 access_token: sessionData.session.access_token,
@@ -163,14 +174,23 @@ const login = async (req, res) => {
                 },
             });
         }
+        // Refetch user with profile to get onboardingCompleted
+        const userWithProfile = await prismaClient_1.default.user.findUnique({
+            where: { id: user.id },
+            include: { profile: true },
+        });
+        if (!userWithProfile) {
+            throw new errorHandler_js_1.default("Failed to fetch user profile", 500);
+        }
         res.json({
             success: true,
             message: "Login successful",
             user: {
-                id: user.id,
-                email: user.email,
-                displayName: user.displayName,
-                role: user.role,
+                id: userWithProfile.id,
+                email: userWithProfile.email,
+                displayName: userWithProfile.displayName,
+                avatarUrl: userWithProfile.avatarUrl,
+                onboardingCompleted: userWithProfile.profile?.onboardingCompleted ?? false,
             },
             session: {
                 access_token: authData.session.access_token,
@@ -213,6 +233,11 @@ const syncUser = async (req, res) => {
         if (!existingProfile) {
             await prismaClient_1.default.userProfile.create({ data: { userId, gender } });
         }
+        // Update lastSyncedAt
+        await prismaClient_1.default.userProfile.updateMany({
+            where: { userId },
+            data: { lastSyncedAt: new Date() },
+        });
         // Refetch user with profile for accurate response
         const fullUser = await prismaClient_1.default.user.findUnique({
             where: { id: userId },
@@ -229,6 +254,7 @@ const syncUser = async (req, res) => {
                 displayName: fullUser.displayName,
                 avatarUrl: fullUser.avatarUrl,
                 profile: fullUser.profile, // matches app expectation
+                onboardingCompleted: fullUser.profile?.onboardingCompleted ?? false,
             },
         });
     }
@@ -382,3 +408,112 @@ const getAllUsers = async (req, res) => {
     }
 };
 exports.getAllUsers = getAllUsers;
+// Get current user with full profile
+const getCurrentUser = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user.sub) {
+            throw new errorHandler_js_1.default("User not authenticated", 401);
+        }
+        const userId = user.sub;
+        const fullUser = await prismaClient_1.default.user.findUnique({
+            where: { id: userId },
+            include: { profile: true },
+        });
+        if (!fullUser) {
+            throw new errorHandler_js_1.default("User not found", 404);
+        }
+        res.json({
+            success: true,
+            user: {
+                id: fullUser.id,
+                email: fullUser.email,
+                displayName: fullUser.displayName,
+                avatarUrl: fullUser.avatarUrl,
+                profile: fullUser.profile,
+                onboardingCompleted: fullUser.profile?.onboardingCompleted ?? false,
+            },
+        });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_js_1.default) {
+            throw err;
+        }
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Failed to fetch user", 500);
+    }
+};
+exports.getCurrentUser = getCurrentUser;
+// Update current user profile
+const updateCurrentUser = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user.sub) {
+            throw new errorHandler_js_1.default("User not authenticated", 401);
+        }
+        const userId = user.sub;
+        // Parse and validate incoming profile fields
+        const parseResult = profileSchemas_validation_js_1.updateProfileSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            throw new errorHandler_js_1.default("Invalid profile payload: " + parseResult.error.issues.map((e) => e.message).join(", "), 400);
+        }
+        const profileData = parseResult.data;
+        // Ensure base user exists
+        const existingUser = await prismaClient_1.default.user.findUnique({ where: { id: userId } });
+        if (!existingUser) {
+            throw new errorHandler_js_1.default("User not found", 404);
+        }
+        // Prepare profile data for update (convert date strings to Date objects)
+        const updateData = {};
+        if (profileData.dateOfBirth) {
+            updateData.dateOfBirth = new Date(profileData.dateOfBirth);
+        }
+        if (profileData.lastPeriodStart) {
+            updateData.lastPeriodStart = new Date(profileData.lastPeriodStart);
+        }
+        // Copy other fields (excluding dates and JSON)
+        Object.entries(profileData).forEach(([key, value]) => {
+            if (key !== "dateOfBirth" && key !== "lastPeriodStart" && key !== "notifications" && value !== undefined) {
+                updateData[key] = value;
+            }
+        });
+        // Handle notifications JSON field separately
+        if (profileData.notifications !== undefined) {
+            updateData.notifications = profileData.notifications;
+        }
+        // Update lastSyncedAt
+        updateData.lastSyncedAt = new Date();
+        // Upsert profile
+        const profile = await prismaClient_1.default.userProfile.upsert({
+            where: { userId },
+            update: updateData,
+            create: { userId, ...updateData },
+        });
+        console.log("profile", profile);
+        // Refetch user with profile for response
+        const fullUser = await prismaClient_1.default.user.findUnique({
+            where: { id: userId },
+            include: { profile: true },
+        });
+        if (!fullUser) {
+            throw new errorHandler_js_1.default("Failed to fetch updated user", 500);
+        }
+        res.json({
+            success: true,
+            user: {
+                id: fullUser.id,
+                email: fullUser.email,
+                displayName: fullUser.displayName,
+                avatarUrl: fullUser.avatarUrl,
+                profile: fullUser.profile,
+                onboardingCompleted: fullUser.profile?.onboardingCompleted ?? false,
+            },
+        });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_js_1.default) {
+            throw err;
+        }
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Failed to update user", 500);
+    }
+};
+exports.updateCurrentUser = updateCurrentUser;

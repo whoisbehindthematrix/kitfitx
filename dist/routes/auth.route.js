@@ -10,12 +10,8 @@ router.post("/register", (0, error_1.TryCatch)(auth_controller_1.register));
 router.post("/login", (0, error_1.TryCatch)(auth_controller_1.login));
 router.post("/token/refresh", (0, error_1.TryCatch)(auth_controller_1.refreshToken));
 router.post("/logout", (0, error_1.TryCatch)(auth_controller_1.logout));
-// Protected route example
+// Protected routes
 router.post("/sync", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(auth_controller_1.syncUser));
-router.get("/me", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(async (req, res) => {
-    res.json({
-        success: true,
-        user: req.user
-    });
-}));
+router.get("/me", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(auth_controller_1.getCurrentUser));
+router.put("/me", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(auth_controller_1.updateCurrentUser));
 exports.default = router;

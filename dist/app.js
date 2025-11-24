@@ -14,10 +14,13 @@ const auth_route_1 = __importDefault(require("./routes/auth.route"));
 const cycle_route_1 = __importDefault(require("./routes/cycle.route"));
 const food_route_1 = __importDefault(require("./routes/food.route"));
 const profile_route_1 = __importDefault(require("./routes/profile.route"));
+const onboarding_route_1 = __importDefault(require("./routes/onboarding.route"));
+const auth_controller_1 = require("./controllers/auth.controller");
+const error_1 = require("./middlewares/error");
 const prismaClient_1 = __importDefault(require("./lib/prismaClient"));
 dotenv_1.default.config({ path: "./.env" });
 exports.envMode = process.env.NODE_ENV?.trim() || "DEVELOPMENT";
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)({
     contentSecurityPolicy: exports.envMode !== "DEVELOPMENT",
@@ -32,6 +35,9 @@ app.use("/api/auth", auth_route_1.default);
 app.use("/api/cycle", cycle_route_1.default);
 app.use("/api/profile", profile_route_1.default);
 app.use("/api/food", food_route_1.default);
+app.use("/api/onboarding", onboarding_route_1.default);
+// Token refresh route (also available at /api/token/refresh per frontend requirements)
+app.post("/api/token/refresh", (0, error_1.TryCatch)(auth_controller_1.refreshToken));
 app.get("/", (req, res) => {
     res.send("Hello, World!");
 });
