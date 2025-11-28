@@ -1,105 +1,368 @@
 import { Request, Response } from "express";
+import { Prisma } from "@prisma/client";
 import prisma from "../lib/prismaClient";
-import { onboardingSchema } from "../validation/profileSchemas.validation.js";
-import ErrorHandler from "@/utils/errorHandler.js";
+import { onboardingSchema, updateOnboardingSchema } from "../validation/onboardingSchemas.validation";
+import ErrorHandler from "@/utils/errorHandler";
+import {
+  transformCycleLengthEnumToNumber,
+  calculateAgeFromDateOfBirth,
+  type OnboardingRequest,
+} from "../types/onboarding.types";
 
-export const completeOnboarding = async (req: Request, res: Response) => {
-  try {
-    const user = req.user;
-    if (!user || !user.sub) {
-      throw new ErrorHandler("User not authenticated", 401);
-    }
+// Helper function to clean data (remove undefined, null, empty arrays, empty strings)
+function cleanOnboardingData(data: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    // Skip undefined and null
+    if (value === undefined || value === null) continue;
+    
+    // Skip empty strings
+    if (typeof value === 'string' && value.trim() === '') continue;
+    
+    // Skip empty arrays
+    if (Array.isArray(value) && value.length === 0) continue;
+    
+    cleaned[key] = value;
+  }
+  
+  return cleaned;
+}
 
-    const userId = user.sub;
+// Helper function to transform enum values to numbers
+function transformOnboardingData(data: OnboardingRequest): Record<string, unknown> {
+  const transformed: Record<string, unknown> = { ...data };
+  
+  // Transform cycleLength enum to averageCycleLength if provided
+  if (data.cycleLength && !data.averageCycleLength) {
+    transformed.averageCycleLength = transformCycleLengthEnumToNumber(data.cycleLength);
+  }
+  
+  // Calculate age from dateOfBirth if age is not provided
+  if (data.dateOfBirth && !data.age) {
+    transformed.age = calculateAgeFromDateOfBirth(data.dateOfBirth);
+  }
+  
+  // Convert dateOfBirth string to Date object for database
+  if (data.dateOfBirth) {
+    transformed.dateOfBirth = new Date(data.dateOfBirth);
+  }
+  
+  return transformed;
+}
 
-    // Parse and validate incoming onboarding data
-    const parseResult = onboardingSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      throw new ErrorHandler(
-        "Invalid onboarding payload: " + parseResult.error.issues.map((e: { message: string }) => e.message).join(", "),
-        400
-      );
-    }
+// POST /api/onboarding - Save onboarding data
+export const saveOnboarding = async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user || !user.sub) {
+    throw new ErrorHandler("User not authenticated", 401);
+  }
 
-    const onboardingData = parseResult.data;
+  const userId = user.sub;
 
-    // Ensure base user exists
-    const existingUser = await prisma.user.findUnique({ where: { id: userId } });
-    if (!existingUser) {
-      throw new ErrorHandler("User not found", 404);
-    }
-
-    // Prepare profile data for update
-    const updateData: Record<string, unknown> = {
-      onboardingCompleted: true,
-      lastSyncedAt: new Date(),
-      averageCycleLength: onboardingData.averageCycleLength,
-    };
-
-    // Handle dateOfBirth - convert from age if provided, or use dateOfBirth directly
-    if (onboardingData.age) {
-      // Calculate date of birth from age (approximate)
-      const birthYear = new Date().getFullYear() - onboardingData.age;
-      updateData.dateOfBirth = new Date(birthYear, 0, 1);
-    } else if (onboardingData.dateOfBirth) {
-      updateData.dateOfBirth = new Date(onboardingData.dateOfBirth);
-    }
-
-    // Add optional fields
-    if (onboardingData.displayName !== undefined) {
-      // Update user displayName if provided
-      await prisma.user.update({
-        where: { id: userId },
-        data: { displayName: onboardingData.displayName },
-      });
-    }
-    if (onboardingData.lutealPhaseDays !== undefined) {
-      updateData.lutealPhaseDays = onboardingData.lutealPhaseDays;
-    }
-    if (onboardingData.activityLevel !== undefined) {
-      updateData.activityLevel = onboardingData.activityLevel;
-    }
-    if (onboardingData.wellnessGoals !== undefined) {
-      updateData.wellnessGoals = onboardingData.wellnessGoals;
-    }
-
-    // Upsert profile with onboarding data
-    await prisma.userProfile.upsert({
-      where: { userId },
-      update: updateData,
-      create: { userId, ...updateData },
-    });
-
-    // Refetch user with profile for response
-    const fullUser = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { profile: true },
-    });
-
-    if (!fullUser) {
-      throw new ErrorHandler("Failed to fetch updated user", 500);
-    }
-
-    res.json({
-      success: true,
-      message: "Onboarding completed successfully",
-      user: {
-        id: fullUser.id,
-        email: fullUser.email,
-        displayName: fullUser.displayName,
-        avatarUrl: fullUser.avatarUrl,
-        profile: fullUser.profile,
-        onboardingCompleted: fullUser.profile?.onboardingCompleted ?? false,
-      },
-    });
-  } catch (err) {
-    if (err instanceof ErrorHandler) {
-      throw err;
-    }
+  // Parse and validate incoming onboarding data
+  const parseResult = onboardingSchema.safeParse(req.body);
+  if (!parseResult.success) {
     throw new ErrorHandler(
-      err instanceof Error ? err.message : "Failed to complete onboarding",
-      500
+      "Invalid onboarding payload: " + parseResult.error.issues.map((e) => e.message).join(", "),
+      400
     );
   }
+
+  const onboardingData = parseResult.data;
+
+  // Ensure user exists
+  const existingUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!existingUser) {
+    throw new ErrorHandler("User not found", 404);
+  }
+
+  // Transform data (enum to number, calculate age, etc.)
+  const transformedData = transformOnboardingData(onboardingData as OnboardingRequest);
+  
+  // Clean data (remove undefined, null, empty arrays, empty strings)
+  const cleanedData = cleanOnboardingData(transformedData);
+
+  // Prepare data for database
+  const dbData: Record<string, unknown> = {
+    userId,
+    averageCycleLength: cleanedData.averageCycleLength || 28,
+    periodDuration: cleanedData.periodDuration || 5,
+  };
+
+  // Add optional fields if they exist
+  if (cleanedData.dateOfBirth) dbData.dateOfBirth = cleanedData.dateOfBirth;
+  if (cleanedData.age !== undefined) dbData.age = cleanedData.age;
+  if (cleanedData.weightRange) dbData.weightRange = cleanedData.weightRange;
+  if (cleanedData.heightRange) dbData.heightRange = cleanedData.heightRange;
+  if (cleanedData.reproductiveStage) dbData.reproductiveStage = cleanedData.reproductiveStage;
+  if (cleanedData.healthGoal) dbData.healthGoal = cleanedData.healthGoal;
+  if (cleanedData.birthControl) dbData.birthControl = cleanedData.birthControl;
+  if (cleanedData.medicalDiagnoses) dbData.medicalDiagnoses = cleanedData.medicalDiagnoses;
+  if (cleanedData.physicalSymptoms) dbData.physicalSymptoms = cleanedData.physicalSymptoms;
+  if (cleanedData.pmsMood) dbData.pmsMood = cleanedData.pmsMood;
+  if (cleanedData.stressLevel) dbData.stressLevel = cleanedData.stressLevel;
+  if (cleanedData.foodStruggles) dbData.foodStruggles = cleanedData.foodStruggles;
+  if (cleanedData.dietaryLifestyle) dbData.dietaryLifestyle = cleanedData.dietaryLifestyle;
+  if (cleanedData.cycleLength) dbData.cycleLength = cleanedData.cycleLength;
+
+  // Upsert onboarding data
+  const onboarding = await prisma.onboardingData.upsert({
+    where: { userId },
+    update: dbData as Prisma.OnboardingDataUpdateInput,
+    create: dbData as Prisma.OnboardingDataCreateInput,
+  });
+
+  // Format response
+  const responseData: Record<string, unknown> = {
+    id: onboarding.id,
+    userId: onboarding.userId,
+    averageCycleLength: onboarding.averageCycleLength,
+    periodDuration: onboarding.periodDuration,
+    isCompleted: onboarding.isCompleted,
+    createdAt: onboarding.createdAt.toISOString(),
+    updatedAt: onboarding.updatedAt.toISOString(),
+  };
+
+  if (onboarding.dateOfBirth) responseData.dateOfBirth = onboarding.dateOfBirth.toISOString().split('T')[0];
+  if (onboarding.age !== null) responseData.age = onboarding.age;
+  if (onboarding.weightRange) responseData.weightRange = onboarding.weightRange;
+  if (onboarding.heightRange) responseData.heightRange = onboarding.heightRange;
+  if (onboarding.reproductiveStage) responseData.reproductiveStage = onboarding.reproductiveStage;
+  if (onboarding.healthGoal) responseData.healthGoal = onboarding.healthGoal;
+  if (onboarding.birthControl.length > 0) responseData.birthControl = onboarding.birthControl;
+  if (onboarding.medicalDiagnoses.length > 0) responseData.medicalDiagnoses = onboarding.medicalDiagnoses;
+  if (onboarding.physicalSymptoms.length > 0) responseData.physicalSymptoms = onboarding.physicalSymptoms;
+  if (onboarding.pmsMood) responseData.pmsMood = onboarding.pmsMood;
+  if (onboarding.stressLevel) responseData.stressLevel = onboarding.stressLevel;
+  if (onboarding.foodStruggles.length > 0) responseData.foodStruggles = onboarding.foodStruggles;
+  if (onboarding.dietaryLifestyle) responseData.dietaryLifestyle = onboarding.dietaryLifestyle;
+  if (onboarding.cycleLength) responseData.cycleLength = onboarding.cycleLength;
+  if (onboarding.completedAt) responseData.completedAt = onboarding.completedAt.toISOString();
+
+  res.status(201).json({
+    success: true,
+    data: responseData,
+    message: "Onboarding data saved successfully",
+  });
 };
 
+// GET /api/onboarding - Retrieve saved onboarding data
+export const getOnboarding = async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user || !user.sub) {
+    throw new ErrorHandler("User not authenticated", 401);
+  }
+
+  const userId = user.sub;
+
+  const onboarding = await prisma.onboardingData.findUnique({
+    where: { userId },
+  });
+
+  if (!onboarding) {
+    return res.status(200).json({
+      success: true,
+      data: null,
+    });
+  }
+
+  // Format response
+  const responseData: Record<string, unknown> = {
+    id: onboarding.id,
+    userId: onboarding.userId,
+    averageCycleLength: onboarding.averageCycleLength,
+    periodDuration: onboarding.periodDuration,
+    isCompleted: onboarding.isCompleted,
+    createdAt: onboarding.createdAt.toISOString(),
+    updatedAt: onboarding.updatedAt.toISOString(),
+  };
+
+  if (onboarding.dateOfBirth) responseData.dateOfBirth = onboarding.dateOfBirth.toISOString().split('T')[0];
+  if (onboarding.age !== null) responseData.age = onboarding.age;
+  if (onboarding.weightRange) responseData.weightRange = onboarding.weightRange;
+  if (onboarding.heightRange) responseData.heightRange = onboarding.heightRange;
+  if (onboarding.reproductiveStage) responseData.reproductiveStage = onboarding.reproductiveStage;
+  if (onboarding.healthGoal) responseData.healthGoal = onboarding.healthGoal;
+  if (onboarding.birthControl.length > 0) responseData.birthControl = onboarding.birthControl;
+  if (onboarding.medicalDiagnoses.length > 0) responseData.medicalDiagnoses = onboarding.medicalDiagnoses;
+  if (onboarding.physicalSymptoms.length > 0) responseData.physicalSymptoms = onboarding.physicalSymptoms;
+  if (onboarding.pmsMood) responseData.pmsMood = onboarding.pmsMood;
+  if (onboarding.stressLevel) responseData.stressLevel = onboarding.stressLevel;
+  if (onboarding.foodStruggles.length > 0) responseData.foodStruggles = onboarding.foodStruggles;
+  if (onboarding.dietaryLifestyle) responseData.dietaryLifestyle = onboarding.dietaryLifestyle;
+  if (onboarding.cycleLength) responseData.cycleLength = onboarding.cycleLength;
+  if (onboarding.completedAt) responseData.completedAt = onboarding.completedAt.toISOString();
+
+  res.status(200).json({
+    success: true,
+    data: responseData,
+  });
+};
+
+// POST /api/onboarding/complete - Mark onboarding as completed
+export const completeOnboarding = async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user || !user.sub) {
+    throw new ErrorHandler("User not authenticated", 401);
+  }
+
+  const userId = user.sub;
+
+  // Check if onboarding data exists
+  const onboarding = await prisma.onboardingData.findUnique({
+    where: { userId },
+  });
+
+  if (!onboarding) {
+    throw new ErrorHandler("Onboarding data not found. Please save onboarding data first.", 404);
+  }
+
+  // Validate required fields before completion
+  if (!onboarding.averageCycleLength || !onboarding.periodDuration) {
+    throw new ErrorHandler(
+      "Cannot complete onboarding: averageCycleLength and periodDuration are required",
+      400
+    );
+  }
+
+  // Validate ranges
+  if (onboarding.averageCycleLength < 21 || onboarding.averageCycleLength > 40) {
+    throw new ErrorHandler(
+      "Cannot complete onboarding: averageCycleLength must be between 21 and 40",
+      400
+    );
+  }
+
+  if (onboarding.periodDuration < 1 || onboarding.periodDuration > 7) {
+    throw new ErrorHandler(
+      "Cannot complete onboarding: periodDuration must be between 1 and 7",
+      400
+    );
+  }
+
+  // Update onboarding data to mark as completed
+  const updatedOnboarding = await prisma.onboardingData.update({
+    where: { userId },
+    data: {
+      isCompleted: true,
+      completedAt: new Date(),
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      completed: updatedOnboarding.isCompleted,
+      completedAt: updatedOnboarding.completedAt?.toISOString(),
+    },
+    message: "Onboarding completed successfully",
+  });
+};
+
+// PATCH /api/onboarding - Update specific fields
+export const updateOnboarding = async (req: Request, res: Response) => {
+  const user = req.user;
+  if (!user || !user.sub) {
+    throw new ErrorHandler("User not authenticated", 401);
+  }
+
+  const userId = user.sub;
+
+  // Parse and validate update data
+  const parseResult = updateOnboardingSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    throw new ErrorHandler(
+      "Invalid update payload: " + parseResult.error.issues.map((e) => e.message).join(", "),
+      400
+    );
+  }
+
+  const updateData = parseResult.data;
+
+  // Check if onboarding data exists
+  const existingOnboarding = await prisma.onboardingData.findUnique({
+    where: { userId },
+  });
+
+  if (!existingOnboarding) {
+    throw new ErrorHandler("Onboarding data not found. Please save onboarding data first.", 404);
+  }
+
+  // Transform data if needed
+  const transformedData = transformOnboardingData(updateData as OnboardingRequest);
+  
+  // Clean data
+  const cleanedData = cleanOnboardingData(transformedData);
+
+  // Prepare update data for database
+  const dbUpdateData: Record<string, unknown> = {};
+
+  // Only include fields that are being updated
+  if (cleanedData.dateOfBirth) dbUpdateData.dateOfBirth = cleanedData.dateOfBirth;
+  if (cleanedData.age !== undefined) dbUpdateData.age = cleanedData.age;
+  if (cleanedData.averageCycleLength !== undefined) dbUpdateData.averageCycleLength = cleanedData.averageCycleLength;
+  if (cleanedData.periodDuration !== undefined) dbUpdateData.periodDuration = cleanedData.periodDuration;
+  if (cleanedData.weightRange) dbUpdateData.weightRange = cleanedData.weightRange;
+  if (cleanedData.heightRange) dbUpdateData.heightRange = cleanedData.heightRange;
+  if (cleanedData.reproductiveStage) dbUpdateData.reproductiveStage = cleanedData.reproductiveStage;
+  if (cleanedData.healthGoal) dbUpdateData.healthGoal = cleanedData.healthGoal;
+  if (cleanedData.birthControl) dbUpdateData.birthControl = cleanedData.birthControl;
+  if (cleanedData.medicalDiagnoses) dbUpdateData.medicalDiagnoses = cleanedData.medicalDiagnoses;
+  if (cleanedData.physicalSymptoms) dbUpdateData.physicalSymptoms = cleanedData.physicalSymptoms;
+  if (cleanedData.pmsMood) dbUpdateData.pmsMood = cleanedData.pmsMood;
+  if (cleanedData.stressLevel) dbUpdateData.stressLevel = cleanedData.stressLevel;
+  if (cleanedData.foodStruggles) dbUpdateData.foodStruggles = cleanedData.foodStruggles;
+  if (cleanedData.dietaryLifestyle) dbUpdateData.dietaryLifestyle = cleanedData.dietaryLifestyle;
+  if (cleanedData.cycleLength) dbUpdateData.cycleLength = cleanedData.cycleLength;
+
+  // If no fields to update, return current data
+  if (Object.keys(dbUpdateData).length === 0) {
+    const currentData = await prisma.onboardingData.findUnique({
+      where: { userId },
+    });
+    
+    return res.status(200).json({
+      success: true,
+      data: currentData,
+    });
+  }
+
+  // Update onboarding data
+  const updatedOnboarding = await prisma.onboardingData.update({
+    where: { userId },
+    data: dbUpdateData as Prisma.OnboardingDataUpdateInput,
+  });
+
+  // Format response
+  const responseData: Record<string, unknown> = {
+    id: updatedOnboarding.id,
+    userId: updatedOnboarding.userId,
+    averageCycleLength: updatedOnboarding.averageCycleLength,
+    periodDuration: updatedOnboarding.periodDuration,
+    isCompleted: updatedOnboarding.isCompleted,
+    createdAt: updatedOnboarding.createdAt.toISOString(),
+    updatedAt: updatedOnboarding.updatedAt.toISOString(),
+  };
+
+  if (updatedOnboarding.dateOfBirth) responseData.dateOfBirth = updatedOnboarding.dateOfBirth.toISOString().split('T')[0];
+  if (updatedOnboarding.age !== null) responseData.age = updatedOnboarding.age;
+  if (updatedOnboarding.weightRange) responseData.weightRange = updatedOnboarding.weightRange;
+  if (updatedOnboarding.heightRange) responseData.heightRange = updatedOnboarding.heightRange;
+  if (updatedOnboarding.reproductiveStage) responseData.reproductiveStage = updatedOnboarding.reproductiveStage;
+  if (updatedOnboarding.healthGoal) responseData.healthGoal = updatedOnboarding.healthGoal;
+  if (updatedOnboarding.birthControl.length > 0) responseData.birthControl = updatedOnboarding.birthControl;
+  if (updatedOnboarding.medicalDiagnoses.length > 0) responseData.medicalDiagnoses = updatedOnboarding.medicalDiagnoses;
+  if (updatedOnboarding.physicalSymptoms.length > 0) responseData.physicalSymptoms = updatedOnboarding.physicalSymptoms;
+  if (updatedOnboarding.pmsMood) responseData.pmsMood = updatedOnboarding.pmsMood;
+  if (updatedOnboarding.stressLevel) responseData.stressLevel = updatedOnboarding.stressLevel;
+  if (updatedOnboarding.foodStruggles.length > 0) responseData.foodStruggles = updatedOnboarding.foodStruggles;
+  if (updatedOnboarding.dietaryLifestyle) responseData.dietaryLifestyle = updatedOnboarding.dietaryLifestyle;
+  if (updatedOnboarding.cycleLength) responseData.cycleLength = updatedOnboarding.cycleLength;
+  if (updatedOnboarding.completedAt) responseData.completedAt = updatedOnboarding.completedAt.toISOString();
+
+  res.status(200).json({
+    success: true,
+    data: responseData,
+  });
+};

@@ -28,6 +28,8 @@ model User {
   profile        UserProfile?
   cycleEntries   CycleEntry[]
   predictions    PredictionData[]
+  quickNotes     QuickNote[]
+  onboardingData OnboardingData?
 }
 
 // ===========================================
@@ -100,6 +102,76 @@ model PredictionData {
   createdAt     DateTime   @default(now())
 }
 
+// ===========================================
+// QUICK NOTES (User quick notes)
+// ===========================================
+model QuickNote {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+
+  date          DateTime
+  title         String
+  icon          String
+  text          String?
+  reminder      Boolean    @default(false)
+  reminderTime  String?    // Time string (HH:mm format)
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId, date])
+}
+
+
+// ===========================================
+// ONBOARDING DATA
+// ===========================================
+model OnboardingData {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id])
+  
+  // Profile Information
+  dateOfBirth           DateTime?
+  age                   Int?
+  
+  // Cycle Information (REQUIRED)
+  averageCycleLength    Int       @default(28)
+  periodDuration        Int       @default(5)
+  
+  // Optional Profile Fields
+  weightRange           String?
+  heightRange           String?
+  reproductiveStage     String?
+  healthGoal            String?
+  
+  // Birth Control
+  birthControl          String[]  @default([])
+  
+  // Medical & Symptoms
+  medicalDiagnoses      String[]  @default([])
+  physicalSymptoms      String[]  @default([])  // max 3 items
+  
+  // Mood & Stress
+  pmsMood               String?
+  stressLevel           String?
+  
+  // Nutrition
+  foodStruggles         String[]  @default([])
+  dietaryLifestyle      String?
+  
+  // Legacy fields
+  cycleLength           String?   // String enum (kept for reference)
+  
+  // Metadata
+  isCompleted           Boolean   @default(false)
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([userId])
+}
 
 enum Role {
   USER
