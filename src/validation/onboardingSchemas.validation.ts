@@ -1,17 +1,8 @@
 import { z } from "zod";
 
-// Enum definitions for validation
-const weightRangeEnum = z.enum([
-  'under_45', '45_50', '50_55', '55_60', '60_65', '65_70',
-  '70_75', '75_80', '80_85', '85_90', '90_95', '95_100',
-  '100_110', '110_120', '120_plus'
-]);
-
-const heightRangeEnum = z.enum([
-  'under_4_10', '4_10', '4_11', '5_0', '5_1', '5_2', '5_3',
-  '5_4', '5_5', '5_6', '5_7', '5_8', '5_9', '5_10', '5_11',
-  '6_0', 'over_6_0'
-]);
+// ===========================================
+// ENUM DEFINITIONS
+// ===========================================
 
 const reproductiveStageEnum = z.enum([
   'menstruating', 'postpartum', 'breastfeeding', 'perimenopause', 'menopause'
@@ -23,10 +14,6 @@ const healthGoalEnum = z.enum([
 
 const birthControlEnum = z.enum([
   'none', 'hormonal_pill', 'hormonal_iud', 'copper_iud', 'implant_injection_patch', 'tubal_ligation'
-]);
-
-const cycleLengthEnum = z.enum([
-  'less_than_21', '21_24', '25_30', '31_35', 'longer_than_35', 'irregular'
 ]);
 
 const medicalDiagnosisEnum = z.enum([
@@ -53,56 +40,69 @@ const dietaryLifestyleEnum = z.enum([
   'omnivore', 'vegetarian', 'vegan', 'pescatarian', 'keto_low_carb', 'gluten_free', 'dairy_free'
 ]);
 
-// Main onboarding schema
+const unitsSystemEnum = z.enum(['metric', 'imperial']);
+
+// ===========================================
+// ONBOARDING SCHEMA (Basic Profile)
+// ===========================================
+
 export const onboardingSchema = z.object({
-  // Profile Information (Optional)
+  // Profile Information
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
-  age: z.number().int().min(0).max(150).optional(),
   
-  // Cycle Information (Required for completion)
+  // Physical Measurements
+  weight: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  targetWeight: z.number().positive().optional(),
+  unitsSystem: unitsSystemEnum.optional(),
+  
+  // Nutrition
+  dailyCalorieGoal: z.number().int().min(0).max(10000).optional(),
+  
+  // Cycle Information (REQUIRED)
   averageCycleLength: z.number().int().min(21).max(40).default(28),
   periodDuration: z.number().int().min(1).max(7),
-  
-  // Optional Profile Fields
-  weightRange: weightRangeEnum.optional(),
-  heightRange: heightRangeEnum.optional(),
-  reproductiveStage: reproductiveStageEnum.optional(),
-  healthGoal: healthGoalEnum.optional(),
-  
-  // Birth Control (Optional)
-  birthControl: z.array(birthControlEnum).optional(),
-  
-  // Medical & Symptoms (Optional)
-  medicalDiagnoses: z.array(medicalDiagnosisEnum).optional(),
-  physicalSymptoms: z.array(physicalSymptomEnum).max(3, "Maximum 3 physical symptoms allowed").optional(),
-  
-  // Mood & Stress (Optional)
-  pmsMood: pmsMoodEnum.optional(),
-  stressLevel: stressLevelEnum.optional(),
-  
-  // Nutrition (Optional)
-  foodStruggles: z.array(foodStruggleEnum).optional(),
-  dietaryLifestyle: dietaryLifestyleEnum.optional(),
-  
-  // Legacy fields
-  cycleLength: cycleLengthEnum.optional(),
-}).refine(
-  () => {
-    // If cycleLength is provided, it should be transformed to averageCycleLength
-    // But we'll handle that in the controller
-    return true;
-  },
-  { message: "Validation passed" }
-);
+});
 
 // Schema for PATCH requests (all fields optional)
 export const updateOnboardingSchema = z.object({
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
-  age: z.number().int().min(0).max(150).optional(),
+  weight: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  targetWeight: z.number().positive().optional(),
+  unitsSystem: unitsSystemEnum.optional(),
+  dailyCalorieGoal: z.number().int().min(0).max(10000).optional(),
   averageCycleLength: z.number().int().min(21).max(40).optional(),
   periodDuration: z.number().int().min(1).max(7).optional(),
-  weightRange: weightRangeEnum.optional(),
-  heightRange: heightRangeEnum.optional(),
+});
+
+// ===========================================
+// ONBOARDING QUESTIONS SCHEMA (Questionnaire)
+// ===========================================
+
+export const onboardingQuestionsSchema = z.object({
+  // Health & Reproductive
+  reproductiveStage: reproductiveStageEnum.optional(),
+  healthGoal: healthGoalEnum.optional(),
+  
+  // Birth Control
+  birthControl: z.array(birthControlEnum).optional(),
+  
+  // Medical & Symptoms
+  medicalDiagnoses: z.array(medicalDiagnosisEnum).optional(),
+  physicalSymptoms: z.array(physicalSymptomEnum).max(3, "Maximum 3 physical symptoms allowed").optional(),
+  
+  // Mood & Stress
+  pmsMood: pmsMoodEnum.optional(),
+  stressLevel: stressLevelEnum.optional(),
+  
+  // Nutrition
+  foodStruggles: z.array(foodStruggleEnum).optional(),
+  dietaryLifestyle: dietaryLifestyleEnum.optional(),
+});
+
+// Schema for PATCH requests (all fields optional)
+export const updateOnboardingQuestionsSchema = z.object({
   reproductiveStage: reproductiveStageEnum.optional(),
   healthGoal: healthGoalEnum.optional(),
   birthControl: z.array(birthControlEnum).optional(),
@@ -112,9 +112,10 @@ export const updateOnboardingSchema = z.object({
   stressLevel: stressLevelEnum.optional(),
   foodStruggles: z.array(foodStruggleEnum).optional(),
   dietaryLifestyle: dietaryLifestyleEnum.optional(),
-  cycleLength: cycleLengthEnum.optional(),
 });
 
-// Schema for completion endpoint (empty or optional confirmation)
-export const completeOnboardingSchema = z.object({}).optional();
+// ===========================================
+// COMPLETION SCHEMA
+// ===========================================
 
+export const completeOnboardingSchema = z.object({}).optional();

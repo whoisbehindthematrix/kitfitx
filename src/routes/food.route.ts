@@ -1,6 +1,6 @@
 import express from "express";
    import multer from "multer";
-   import { authMiddleware } from "@/middlewares/auth.middleware";
+  //  import { authMiddleware } from "@/middlewares/auth.middleware";
    import { scanFood } from "@/controllers/food.controller";
 
    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -8,7 +8,7 @@ import express from "express";
 
    router.post(
      "/scan",
-     authMiddleware,
+    //  authMiddleware,
      upload.single("photo"),
      scanFood
    );

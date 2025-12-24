@@ -33,19 +33,28 @@ import { Request, Response } from "express";
        { text: promptText + " Respond as JSON with fields food_name, calories, protein_grams, fat_grams, carbs_grams, notes." },
      ]);
 
-     const output = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
-     if (!output) {
-       throw new ErrorHandler("Gemini response empty", 502);
-     }
+    const output = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!output) {
+      throw new ErrorHandler("Gemini response empty", 502);
+    }
 
-     // Gemini might add Markdown-style code fences; strip them.
-     const cleaned = output.replace(/```json|```/g, "");
-     let parsed;
-     try {
-       parsed = JSON.parse(cleaned);
-     } catch {
-       throw new ErrorHandler("Gemini did not return valid JSON", 502);
-     }
+    // Gemini sometimes wraps JSON in code fences or adds extra text.
+    // 1) Strip fences
+    // 2) Extract the first JSON object
+    const cleaned = output.replace(/```json|```/g, "").trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new ErrorHandler("Gemini did not return valid JSON", 502);
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      console.error("Gemini JSON parse error. Raw:", cleaned);
+      throw new ErrorHandler("Gemini did not return valid JSON", 502);
+    }
 
      return res.status(200).json({
        success: true,

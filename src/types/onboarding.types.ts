@@ -1,14 +1,8 @@
-// Type definitions for onboarding enums
+// Type definitions for onboarding enums and interfaces
 
-export type WeightRange =
-  | 'under_45' | '45_50' | '50_55' | '55_60' | '60_65' | '65_70'
-  | '70_75' | '75_80' | '80_85' | '85_90' | '90_95' | '95_100'
-  | '100_110' | '110_120' | '120_plus';
-
-export type HeightRange =
-  | 'under_4_10' | '4_10' | '4_11' | '5_0' | '5_1' | '5_2' | '5_3'
-  | '5_4' | '5_5' | '5_6' | '5_7' | '5_8' | '5_9' | '5_10' | '5_11'
-  | '6_0' | 'over_6_0';
+// ===========================================
+// ENUMS
+// ===========================================
 
 export type ReproductiveStage =
   | 'menstruating' | 'postpartum' | 'breastfeeding' | 'perimenopause' | 'menopause';
@@ -18,9 +12,6 @@ export type HealthGoal =
 
 export type BirthControl =
   | 'none' | 'hormonal_pill' | 'hormonal_iud' | 'copper_iud' | 'implant_injection_patch' | 'tubal_ligation';
-
-export type CycleLength =
-  | 'less_than_21' | '21_24' | '25_30' | '31_35' | 'longer_than_35' | 'irregular';
 
 export type MedicalDiagnosis =
   | 'pcos' | 'endometriosis' | 'fibroids' | 'hypothyroidism' | 'hyperthyroidism' | 'pmdd' | 'none';
@@ -40,39 +31,29 @@ export type FoodStruggle =
 export type DietaryLifestyle =
   | 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto_low_carb' | 'gluten_free' | 'dairy_free';
 
-// Onboarding request/response types
+export type UnitsSystem =
+  | 'metric' | 'imperial';
+
+// ===========================================
+// ONBOARDING (Basic Profile)
+// ===========================================
+
 export interface OnboardingRequest {
-  // Profile Information (Optional)
+  // Profile Information
   dateOfBirth?: string;           // ISO date string (YYYY-MM-DD)
-  age?: number;                   // Integer (calculated from dateOfBirth if not provided)
   
-  // Cycle Information (Required for completion)
-  averageCycleLength: number;     // Integer (days) - REQUIRED
-  periodDuration: number;         // Integer (days) - REQUIRED
+  // Physical Measurements
+  weight?: number;                 // Actual weight value
+  height?: number;                 // Actual height value
+  targetWeight?: number;
+  unitsSystem?: UnitsSystem;        // "metric" | "imperial"
   
-  // Optional Profile Fields
-  weightRange?: WeightRange;
-  heightRange?: HeightRange;
-  reproductiveStage?: ReproductiveStage;
-  healthGoal?: HealthGoal;
+  // Nutrition
+  dailyCalorieGoal?: number;
   
-  // Birth Control (Optional)
-  birthControl?: BirthControl[];
-  
-  // Medical & Symptoms (Optional)
-  medicalDiagnoses?: MedicalDiagnosis[];
-  physicalSymptoms?: PhysicalSymptom[];   // max 3
-  
-  // Mood & Stress (Optional)
-  pmsMood?: PMSMood;
-  stressLevel?: StressLevel;
-  
-  // Nutrition (Optional)
-  foodStruggles?: FoodStruggle[];
-  dietaryLifestyle?: DietaryLifestyle;
-  
-  // Legacy fields
-  cycleLength?: CycleLength;
+  // Cycle Information (REQUIRED)
+  averageCycleLength: number;       // Integer (days) - REQUIRED
+  periodDuration: number;           // Integer (days) - REQUIRED
 }
 
 export interface OnboardingResponse {
@@ -81,11 +62,51 @@ export interface OnboardingResponse {
     id: string;
     userId: string;
     dateOfBirth?: string;
-    age?: number;
+    weight?: number;
+    height?: number;
+    targetWeight?: number;
+    unitsSystem?: UnitsSystem;
+    dailyCalorieGoal?: number;
     averageCycleLength: number;
     periodDuration: number;
-    weightRange?: WeightRange;
-    heightRange?: HeightRange;
+    isCompleted: boolean;
+    completedAt?: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  message?: string;
+}
+
+// ===========================================
+// ONBOARDING QUESTIONS (Questionnaire)
+// ===========================================
+
+export interface OnboardingQuestionsRequest {
+  // Health & Reproductive
+  reproductiveStage?: ReproductiveStage;
+  healthGoal?: HealthGoal;
+  
+  // Birth Control
+  birthControl?: BirthControl[];
+  
+  // Medical & Symptoms
+  medicalDiagnoses?: MedicalDiagnosis[];
+  physicalSymptoms?: PhysicalSymptom[];   // max 3
+  
+  // Mood & Stress
+  pmsMood?: PMSMood;
+  stressLevel?: StressLevel;
+  
+  // Nutrition
+  foodStruggles?: FoodStruggle[];
+  dietaryLifestyle?: DietaryLifestyle;
+}
+
+export interface OnboardingQuestionsResponse {
+  success: boolean;
+  data?: {
+    id: string;
+    userId: string;
     reproductiveStage?: ReproductiveStage;
     healthGoal?: HealthGoal;
     birthControl?: BirthControl[];
@@ -95,7 +116,6 @@ export interface OnboardingResponse {
     stressLevel?: StressLevel;
     foodStruggles?: FoodStruggle[];
     dietaryLifestyle?: DietaryLifestyle;
-    cycleLength?: CycleLength;
     isCompleted: boolean;
     completedAt?: string;
     createdAt: string;
@@ -104,33 +124,9 @@ export interface OnboardingResponse {
   message?: string;
 }
 
-// Helper functions for data transformation
-export function transformCycleLengthEnumToNumber(cycleLength?: CycleLength): number {
-  if (!cycleLength) return 28; // default
-  
-  const mapping: Record<CycleLength, number> = {
-    'less_than_21': 20,
-    '21_24': 23,
-    '25_30': 28,
-    '31_35': 33,
-    'longer_than_35': 36,
-    'irregular': 28,
-  };
-  
-  return mapping[cycleLength] || 28;
-}
-
-export function transformPeriodDurationEnumToNumber(periodDuration?: string): number {
-  if (!periodDuration) return 5; // default
-  
-  const mapping: Record<string, number> = {
-    '1_3': 2,
-    '4_6': 5,
-    '7_plus': 7,
-  };
-  
-  return mapping[periodDuration] || 5;
-}
+// ===========================================
+// HELPER FUNCTIONS
+// ===========================================
 
 export function calculateAgeFromDateOfBirth(dateOfBirth: string): number {
   const birthDate = new Date(dateOfBirth);
@@ -144,4 +140,3 @@ export function calculateAgeFromDateOfBirth(dateOfBirth: string): number {
   
   return age;
 }
-

@@ -25,11 +25,12 @@ model User {
   role           Role         @default(USER)
 
 
-  profile        UserProfile?
-  cycleEntries   CycleEntry[]
-  predictions    PredictionData[]
-  quickNotes     QuickNote[]
-  onboardingData OnboardingData?
+  profile              UserProfile?
+  cycleEntries         CycleEntry[]
+  predictions          PredictionData[]
+  quickNotes           QuickNote[]
+  onboarding           Onboarding?
+  onboardingQuestions  OnboardingQuestions?
 }
 
 // ===========================================
@@ -125,50 +126,70 @@ model QuickNote {
 
 
 // ===========================================
-// ONBOARDING DATA
+// ONBOARDING (Basic Profile Information)
 // ===========================================
-model OnboardingData {
-  id                    String    @id @default(cuid())
-  userId                String    @unique
-  user                  User      @relation(fields: [userId], references: [id])
+model Onboarding {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id])
   
   // Profile Information
-  dateOfBirth           DateTime?
-  age                   Int?
+  dateOfBirth         DateTime?
   
-  // Cycle Information (REQUIRED)
-  averageCycleLength    Int       @default(28)
-  periodDuration        Int       @default(5)
-  
-  // Optional Profile Fields
-  weightRange           String?
-  heightRange           String?
-  reproductiveStage     String?
-  healthGoal            String?
-  
-  // Birth Control
-  birthControl          String[]  @default([])
-  
-  // Medical & Symptoms
-  medicalDiagnoses      String[]  @default([])
-  physicalSymptoms      String[]  @default([])  // max 3 items
-  
-  // Mood & Stress
-  pmsMood               String?
-  stressLevel           String?
+  // Physical Measurements
+  weight              Float?    // Actual weight value
+  height              Float?    // Actual height value
+  targetWeight        Float?
+  unitsSystem         String?   // "metric" | "imperial"
   
   // Nutrition
-  foodStruggles         String[]  @default([])
-  dietaryLifestyle      String?
+  dailyCalorieGoal    Int?
   
-  // Legacy fields
-  cycleLength           String?   // String enum (kept for reference)
+  // Cycle Information (REQUIRED)
+  averageCycleLength  Int       @default(28)
+  periodDuration      Int       @default(5)
   
   // Metadata
-  isCompleted           Boolean   @default(false)
-  completedAt           DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  isCompleted         Boolean   @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([userId])
+}
+
+// ===========================================
+// ONBOARDING QUESTIONS (Questionnaire)
+// ===========================================
+model OnboardingQuestions {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id])
+  
+  // Health & Reproductive
+  reproductiveStage   String?
+  healthGoal          String?
+  
+  // Birth Control
+  birthControl        String[]  @default([])
+  
+  // Medical & Symptoms
+  medicalDiagnoses    String[]  @default([])
+  physicalSymptoms    String[]  @default([])  // max 3 items
+  
+  // Mood & Stress
+  pmsMood             String?
+  stressLevel         String?
+  
+  // Nutrition
+  foodStruggles       String[]  @default([])
+  dietaryLifestyle     String?
+  
+  // Metadata
+  isCompleted         Boolean   @default(false)
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
   
   @@index([userId])
 }

@@ -28,7 +28,7 @@ export async function authMiddleware(
     const header: string = (req.headers.authorization ?? "") as string;
     const token: string = header.replace("Bearer ", "");
 
-    console.log("Auth Middleware - Token:", token, JWKS);
+    // console.log("Auth Middleware - Token:", token, JWKS);
 
     if (!token) return res.status(401).json({ error: "Missing token" });
 

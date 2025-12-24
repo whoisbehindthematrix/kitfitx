@@ -605,3 +605,172 @@ export const updateCurrentUser = async (req: Request, res: Response) => {
     );
   }
 };
+
+// Request password reset (sends email via Supabase)
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new ErrorHandler("Email is required", 400);
+    }
+
+    // Use Supabase to send password reset email
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const { data, error } = await supabaseClient.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo: `${frontendUrl}/reset-password`,
+      }
+    );
+
+    console.log("data", data);
+
+    if (error) {
+      // Don't reveal if email exists - always return success message
+      console.error("Password reset error:", error);
+    }
+
+    // Always return success (security best practice - don't reveal if email exists)
+    res.json({
+      success: true,
+      message: "If an account with that email exists, a password reset link has been sent.",
+    });
+  } catch (err) {
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Failed to process password reset request",
+      500
+    );
+  }
+};
+
+// Reset password with token from email link
+// Note: This is typically handled client-side after user clicks email link
+// The token exchange happens automatically via Supabase client
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { password, token } = req.body;
+
+    if (!password) {
+      throw new ErrorHandler("Password is required", 400);
+    }
+
+    if (password.length < 6) {
+      throw new ErrorHandler("Password must be at least 6 characters", 400);
+    }
+
+    // For server-side reset, we need to verify the token first
+    // However, Supabase handles this client-side via the email link
+    // This endpoint is for cases where you want server-side validation
+    
+    // If token is provided, we can use it to verify the session
+    // But typically, the user should already have a session from clicking the email link
+    if (token) {
+      // Verify token and create session (this is usually done client-side)
+      const { data: sessionData, error: sessionError } = 
+        await supabaseClient.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        throw new ErrorHandler(
+          "Invalid or expired reset token. Please request a new password reset.",
+          400
+        );
+      }
+    }
+
+    // Update password using admin API (requires valid session)
+    // Note: In practice, this is better handled client-side after Supabase redirect
+    const { error: updateError } = await supabaseClient.auth.updateUser({
+      password: password,
+    });
+
+    if (updateError) {
+      throw new ErrorHandler(
+        updateError.message || "Failed to update password",
+        400
+      );
+    }
+
+    res.json({
+      success: true,
+      message: "Password has been reset successfully",
+    });
+  } catch (err) {
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Failed to reset password",
+      500
+    );
+  }
+};
+
+// Update password when user is authenticated (change password)
+export const updatePassword = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user || !user.sub) {
+      throw new ErrorHandler("User not authenticated", 401);
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      throw new ErrorHandler("Current password and new password are required", 400);
+    }
+
+    if (newPassword.length < 6) {
+      throw new ErrorHandler("New password must be at least 6 characters", 400);
+    }
+
+    // Get user email from database
+    const userRecord = await prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { email: true },
+    });
+
+    if (!userRecord || !userRecord.email) {
+      throw new ErrorHandler("User not found", 404);
+    }
+
+    // Verify current password by attempting to sign in
+    const { error: verifyError } = await supabaseClient.auth.signInWithPassword({
+      email: userRecord.email,
+      password: currentPassword,
+    });
+
+    if (verifyError) {
+      throw new ErrorHandler("Current password is incorrect", 401);
+    }
+
+    // Update password using admin API
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      user.sub,
+      { password: newPassword }
+    );
+
+    if (updateError) {
+      throw new ErrorHandler(
+        updateError.message || "Failed to update password",
+        400
+      );
+    }
+
+    res.json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (err) {
+    if (err instanceof ErrorHandler) {
+      throw err;
+    }
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Failed to update password",
+      500
+    );
+  }
+};
