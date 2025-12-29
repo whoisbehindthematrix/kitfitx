@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateCurrentUser = exports.getCurrentUser = exports.getAllUsers = exports.verifyEmail = exports.logout = exports.refreshToken = exports.syncUser = exports.login = exports.register = void 0;
+exports.updatePassword = exports.resetPassword = exports.forgotPassword = exports.updateCurrentUser = exports.getCurrentUser = exports.getAllUsers = exports.verifyEmail = exports.logout = exports.refreshToken = exports.syncUser = exports.login = exports.register = void 0;
 const prismaClient_1 = __importDefault(require("../lib/prismaClient"));
 const supabase_js_1 = require("@supabase/supabase-js");
 const errorHandler_js_1 = __importDefault(require("../utils/errorHandler.js"));
@@ -517,3 +517,127 @@ const updateCurrentUser = async (req, res) => {
     }
 };
 exports.updateCurrentUser = updateCurrentUser;
+// Request password reset (sends email via Supabase)
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            throw new errorHandler_js_1.default("Email is required", 400);
+        }
+        // Use Supabase to send password reset email
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+        const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: `${frontendUrl}/reset-password`,
+        });
+        console.log("data", data);
+        if (error) {
+            // Don't reveal if email exists - always return success message
+            console.error("Password reset error:", error);
+        }
+        // Always return success (security best practice - don't reveal if email exists)
+        res.json({
+            success: true,
+            message: "If an account with that email exists, a password reset link has been sent.",
+        });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_js_1.default) {
+            throw err;
+        }
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Failed to process password reset request", 500);
+    }
+};
+exports.forgotPassword = forgotPassword;
+// Reset password with token from email link
+// Note: This is typically handled client-side after user clicks email link
+// The token exchange happens automatically via Supabase client
+const resetPassword = async (req, res) => {
+    try {
+        const { password, token } = req.body;
+        if (!password) {
+            throw new errorHandler_js_1.default("Password is required", 400);
+        }
+        if (password.length < 6) {
+            throw new errorHandler_js_1.default("Password must be at least 6 characters", 400);
+        }
+        // For server-side reset, we need to verify the token first
+        // However, Supabase handles this client-side via the email link
+        // This endpoint is for cases where you want server-side validation
+        // If token is provided, we can use it to verify the session
+        // But typically, the user should already have a session from clicking the email link
+        if (token) {
+            // Verify token and create session (this is usually done client-side)
+            const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError || !sessionData.session) {
+                throw new errorHandler_js_1.default("Invalid or expired reset token. Please request a new password reset.", 400);
+            }
+        }
+        // Update password using admin API (requires valid session)
+        // Note: In practice, this is better handled client-side after Supabase redirect
+        const { error: updateError } = await supabaseClient.auth.updateUser({
+            password: password,
+        });
+        if (updateError) {
+            throw new errorHandler_js_1.default(updateError.message || "Failed to update password", 400);
+        }
+        res.json({
+            success: true,
+            message: "Password has been reset successfully",
+        });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_js_1.default) {
+            throw err;
+        }
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Failed to reset password", 500);
+    }
+};
+exports.resetPassword = resetPassword;
+// Update password when user is authenticated (change password)
+const updatePassword = async (req, res) => {
+    try {
+        const user = req.user;
+        if (!user || !user.sub) {
+            throw new errorHandler_js_1.default("User not authenticated", 401);
+        }
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            throw new errorHandler_js_1.default("Current password and new password are required", 400);
+        }
+        if (newPassword.length < 6) {
+            throw new errorHandler_js_1.default("New password must be at least 6 characters", 400);
+        }
+        // Get user email from database
+        const userRecord = await prismaClient_1.default.user.findUnique({
+            where: { id: user.sub },
+            select: { email: true },
+        });
+        if (!userRecord || !userRecord.email) {
+            throw new errorHandler_js_1.default("User not found", 404);
+        }
+        // Verify current password by attempting to sign in
+        const { error: verifyError } = await supabaseClient.auth.signInWithPassword({
+            email: userRecord.email,
+            password: currentPassword,
+        });
+        if (verifyError) {
+            throw new errorHandler_js_1.default("Current password is incorrect", 401);
+        }
+        // Update password using admin API
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.sub, { password: newPassword });
+        if (updateError) {
+            throw new errorHandler_js_1.default(updateError.message || "Failed to update password", 400);
+        }
+        res.json({
+            success: true,
+            message: "Password updated successfully",
+        });
+    }
+    catch (err) {
+        if (err instanceof errorHandler_js_1.default) {
+            throw err;
+        }
+        throw new errorHandler_js_1.default(err instanceof Error ? err.message : "Failed to update password", 500);
+    }
+};
+exports.updatePassword = updatePassword;

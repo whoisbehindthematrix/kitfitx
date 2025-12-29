@@ -9,8 +9,18 @@ const onboarding_controller_1 = require("../controllers/onboarding.controller");
 const error_1 = require("../middlewares/error");
 const router = express_1.default.Router();
 // All routes require authentication
+// ===========================================
+// ONBOARDING ROUTES (Basic Profile)
+// ===========================================
 router.post("/", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.saveOnboarding));
 router.get("/", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.getOnboarding));
-router.post("/complete", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.completeOnboarding));
 router.patch("/", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.updateOnboarding));
+router.post("/complete", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.completeOnboarding));
+// ===========================================
+// ONBOARDING QUESTIONS ROUTES (Questionnaire)
+// ===========================================
+router.post("/questions", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.saveOnboardingQuestions));
+router.get("/questions", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.getOnboardingQuestions));
+router.patch("/questions", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.updateOnboardingQuestions));
+router.post("/questions/complete", auth_middleware_1.authMiddleware, (0, error_1.TryCatch)(onboarding_controller_1.completeOnboardingQuestions));
 exports.default = router;

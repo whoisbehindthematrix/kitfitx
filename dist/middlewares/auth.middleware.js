@@ -7,7 +7,7 @@ async function authMiddleware(req, res, next) {
     try {
         const header = (req.headers.authorization ?? "");
         const token = header.replace("Bearer ", "");
-        console.log("Auth Middleware - Token:", token, JWKS);
+        // console.log("Auth Middleware - Token:", token, JWKS);
         if (!token)
             return res.status(401).json({ error: "Missing token" });
         const { payload } = (await (0, jose_1.jwtVerify)(token, JWKS));

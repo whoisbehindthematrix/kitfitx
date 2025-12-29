@@ -1,18 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.completeOnboardingSchema = exports.updateOnboardingSchema = exports.onboardingSchema = void 0;
+exports.completeOnboardingSchema = exports.updateOnboardingQuestionsSchema = exports.onboardingQuestionsSchema = exports.updateOnboardingSchema = exports.onboardingSchema = void 0;
 const zod_1 = require("zod");
-// Enum definitions for validation
-const weightRangeEnum = zod_1.z.enum([
-    'under_45', '45_50', '50_55', '55_60', '60_65', '65_70',
-    '70_75', '75_80', '80_85', '85_90', '90_95', '95_100',
-    '100_110', '110_120', '120_plus'
-]);
-const heightRangeEnum = zod_1.z.enum([
-    'under_4_10', '4_10', '4_11', '5_0', '5_1', '5_2', '5_3',
-    '5_4', '5_5', '5_6', '5_7', '5_8', '5_9', '5_10', '5_11',
-    '6_0', 'over_6_0'
-]);
+// ===========================================
+// ENUM DEFINITIONS
+// ===========================================
 const reproductiveStageEnum = zod_1.z.enum([
     'menstruating', 'postpartum', 'breastfeeding', 'perimenopause', 'menopause'
 ]);
@@ -21,9 +13,6 @@ const healthGoalEnum = zod_1.z.enum([
 ]);
 const birthControlEnum = zod_1.z.enum([
     'none', 'hormonal_pill', 'hormonal_iud', 'copper_iud', 'implant_injection_patch', 'tubal_ligation'
-]);
-const cycleLengthEnum = zod_1.z.enum([
-    'less_than_21', '21_24', '25_30', '31_35', 'longer_than_35', 'irregular'
 ]);
 const medicalDiagnosisEnum = zod_1.z.enum([
     'pcos', 'endometriosis', 'fibroids', 'hypothyroidism', 'hyperthyroidism', 'pmdd', 'none'
@@ -43,45 +32,56 @@ const foodStruggleEnum = zod_1.z.enum([
 const dietaryLifestyleEnum = zod_1.z.enum([
     'omnivore', 'vegetarian', 'vegan', 'pescatarian', 'keto_low_carb', 'gluten_free', 'dairy_free'
 ]);
-// Main onboarding schema
+const unitsSystemEnum = zod_1.z.enum(['metric', 'imperial']);
+// ===========================================
+// ONBOARDING SCHEMA (Basic Profile)
+// ===========================================
 exports.onboardingSchema = zod_1.z.object({
-    // Profile Information (Optional)
+    // Profile Information
     dateOfBirth: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
-    age: zod_1.z.number().int().min(0).max(150).optional(),
-    // Cycle Information (Required for completion)
+    // Physical Measurements
+    weight: zod_1.z.number().positive().optional(),
+    height: zod_1.z.number().positive().optional(),
+    targetWeight: zod_1.z.number().positive().optional(),
+    unitsSystem: unitsSystemEnum.optional(),
+    // Nutrition
+    dailyCalorieGoal: zod_1.z.number().int().min(0).max(10000).optional(),
+    // Cycle Information (REQUIRED)
     averageCycleLength: zod_1.z.number().int().min(21).max(40).default(28),
     periodDuration: zod_1.z.number().int().min(1).max(7),
-    // Optional Profile Fields
-    weightRange: weightRangeEnum.optional(),
-    heightRange: heightRangeEnum.optional(),
-    reproductiveStage: reproductiveStageEnum.optional(),
-    healthGoal: healthGoalEnum.optional(),
-    // Birth Control (Optional)
-    birthControl: zod_1.z.array(birthControlEnum).optional(),
-    // Medical & Symptoms (Optional)
-    medicalDiagnoses: zod_1.z.array(medicalDiagnosisEnum).optional(),
-    physicalSymptoms: zod_1.z.array(physicalSymptomEnum).max(3, "Maximum 3 physical symptoms allowed").optional(),
-    // Mood & Stress (Optional)
-    pmsMood: pmsMoodEnum.optional(),
-    stressLevel: stressLevelEnum.optional(),
-    // Nutrition (Optional)
-    foodStruggles: zod_1.z.array(foodStruggleEnum).optional(),
-    dietaryLifestyle: dietaryLifestyleEnum.optional(),
-    // Legacy fields
-    cycleLength: cycleLengthEnum.optional(),
-}).refine(() => {
-    // If cycleLength is provided, it should be transformed to averageCycleLength
-    // But we'll handle that in the controller
-    return true;
-}, { message: "Validation passed" });
+});
 // Schema for PATCH requests (all fields optional)
 exports.updateOnboardingSchema = zod_1.z.object({
     dateOfBirth: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional(),
-    age: zod_1.z.number().int().min(0).max(150).optional(),
+    weight: zod_1.z.number().positive().optional(),
+    height: zod_1.z.number().positive().optional(),
+    targetWeight: zod_1.z.number().positive().optional(),
+    unitsSystem: unitsSystemEnum.optional(),
+    dailyCalorieGoal: zod_1.z.number().int().min(0).max(10000).optional(),
     averageCycleLength: zod_1.z.number().int().min(21).max(40).optional(),
     periodDuration: zod_1.z.number().int().min(1).max(7).optional(),
-    weightRange: weightRangeEnum.optional(),
-    heightRange: heightRangeEnum.optional(),
+});
+// ===========================================
+// ONBOARDING QUESTIONS SCHEMA (Questionnaire)
+// ===========================================
+exports.onboardingQuestionsSchema = zod_1.z.object({
+    // Health & Reproductive
+    reproductiveStage: reproductiveStageEnum.optional(),
+    healthGoal: healthGoalEnum.optional(),
+    // Birth Control
+    birthControl: zod_1.z.array(birthControlEnum).optional(),
+    // Medical & Symptoms
+    medicalDiagnoses: zod_1.z.array(medicalDiagnosisEnum).optional(),
+    physicalSymptoms: zod_1.z.array(physicalSymptomEnum).max(3, "Maximum 3 physical symptoms allowed").optional(),
+    // Mood & Stress
+    pmsMood: pmsMoodEnum.optional(),
+    stressLevel: stressLevelEnum.optional(),
+    // Nutrition
+    foodStruggles: zod_1.z.array(foodStruggleEnum).optional(),
+    dietaryLifestyle: dietaryLifestyleEnum.optional(),
+});
+// Schema for PATCH requests (all fields optional)
+exports.updateOnboardingQuestionsSchema = zod_1.z.object({
     reproductiveStage: reproductiveStageEnum.optional(),
     healthGoal: healthGoalEnum.optional(),
     birthControl: zod_1.z.array(birthControlEnum).optional(),
@@ -91,7 +91,8 @@ exports.updateOnboardingSchema = zod_1.z.object({
     stressLevel: stressLevelEnum.optional(),
     foodStruggles: zod_1.z.array(foodStruggleEnum).optional(),
     dietaryLifestyle: dietaryLifestyleEnum.optional(),
-    cycleLength: cycleLengthEnum.optional(),
 });
-// Schema for completion endpoint (empty or optional confirmation)
+// ===========================================
+// COMPLETION SCHEMA
+// ===========================================
 exports.completeOnboardingSchema = zod_1.z.object({}).optional();

@@ -31,6 +31,8 @@ model User {
   quickNotes           QuickNote[]
   onboarding           Onboarding?
   onboardingQuestions  OnboardingQuestions?
+  scannedFoods         ScannedFood[]
+  foodLogs             FoodLog[]
 }
 
 // ===========================================
@@ -192,6 +194,90 @@ model OnboardingQuestions {
   updatedAt           DateTime  @updatedAt
   
   @@index([userId])
+}
+
+// ===========================================
+// FOOD MODELS
+// ===========================================
+
+// AI Scanned Food (per user)
+model ScannedFood {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  
+  foodName      String
+  calories      Int
+  proteinGrams  Float
+  fatGrams      Float
+  carbsGrams    Float
+  notes         String?
+  
+  imageUrl      String?   // optional (Cloudinary or stored URL)
+  source        String    @default("AI") // AI | MANUAL
+  
+  createdAt     DateTime  @default(now())
+  
+  foodLogs      FoodLog[]
+  
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+// Global Food List (Admin controlled)
+model GlobalFood {
+  id            String    @id @default(cuid())
+  
+  name          String
+  category      FoodCategory
+  
+  calories      Int
+  proteinGrams  Float
+  fatGrams      Float
+  carbsGrams    Float
+  
+  imageUrl      String?   // optional image URL
+  
+  isActive      Boolean   @default(true)
+  
+  createdBy     String    // admin userId
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  foodLogs      FoodLog[]
+  
+  @@index([category, isActive])
+  @@index([isActive])
+}
+
+// Daily Food Log (what user actually eats)
+model FoodLog {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  
+  date          DateTime      // normalize to 00:00
+  
+  // Either from global food OR scanned food (never both)
+  globalFoodId  String?
+  scannedFoodId String?
+  
+  quantity      Float         @default(1) // servings
+  
+  globalFood    GlobalFood?   @relation(fields: [globalFoodId], references: [id])
+  scannedFood   ScannedFood?  @relation(fields: [scannedFoodId], references: [id])
+  
+  createdAt     DateTime      @default(now())
+  
+  @@index([userId, date])
+  @@index([date])
+}
+
+enum FoodCategory {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
 }
 
 enum Role {
