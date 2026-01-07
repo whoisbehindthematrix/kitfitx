@@ -37,6 +37,27 @@ const scanFood = async (req, res) => {
     const base64Image = file.buffer.toString("base64");
     const model = gemini.getGenerativeModel({ model: modelId });
     const promptText = prompt ?? "Identify the food and give calories, macros, and key nutrients.";
+    // Enhanced prompt to ensure JSON-only response
+    const jsonPrompt = `${promptText} 
+
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON.
+The JSON must have exactly these fields:
+- food_name (string)
+- calories (number)
+- protein_grams (number)
+- fat_grams (number)
+- carbs_grams (number)
+- notes (string or null)
+
+Example format:
+{
+  "food_name": "Chicken Salad",
+  "calories": 320,
+  "protein_grams": 25.5,
+  "fat_grams": 12.3,
+  "carbs_grams": 18.2,
+  "notes": "Fresh salad with grilled chicken"
+}`;
     const result = await model.generateContent([
         {
             inlineData: {
@@ -44,25 +65,47 @@ const scanFood = async (req, res) => {
                 data: base64Image,
             },
         },
-        { text: promptText + " Respond as JSON with fields food_name, calories, protein_grams, fat_grams, carbs_grams, notes." },
+        { text: jsonPrompt },
     ]);
     const output = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!output) {
         throw new errorHandler_1.default("Gemini response empty", 502);
     }
-    // Parse Gemini response
-    const cleaned = output.replace(/```json|```/g, "").trim();
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new errorHandler_1.default("Gemini did not return valid JSON", 502);
-    }
+    // Parse Gemini response with multiple strategies
     let parsed;
     try {
-        parsed = JSON.parse(jsonMatch[0]);
+        // Strategy 1: Try direct JSON parse (if response is pure JSON)
+        try {
+            parsed = JSON.parse(output.trim());
+        }
+        catch {
+            // Strategy 2: Remove markdown code blocks and try again
+            const cleaned = output
+                .replace(/```json\s*/g, "")
+                .replace(/```\s*/g, "")
+                .trim();
+            // Strategy 3: Extract JSON object from text using regex
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                parsed = JSON.parse(jsonMatch[0]);
+            }
+            else {
+                // Strategy 4: Try to find JSON array or nested structures
+                const anyJsonMatch = cleaned.match(/(\{|\[)[\s\S]*(\}|\])/);
+                if (anyJsonMatch) {
+                    parsed = JSON.parse(anyJsonMatch[0]);
+                }
+                else {
+                    throw new Error("No JSON found in response");
+                }
+            }
+        }
     }
-    catch {
-        console.error("Gemini JSON parse error. Raw:", cleaned);
-        throw new errorHandler_1.default("Gemini did not return valid JSON", 502);
+    catch (error) {
+        // Log the actual response for debugging
+        console.error("Gemini JSON parse error. Raw output:", output);
+        console.error("Parse error:", error);
+        throw new errorHandler_1.default(`Gemini did not return valid JSON. Response: ${output.substring(0, 200)}...`, 502);
     }
     // Map Gemini response to our schema
     const scannedFoodData = {
