@@ -9,6 +9,7 @@ import cycleRoutes from "./routes/cycle.route";
 import foodRoutes from "./routes/food.route";
 import profileRoutes from "./routes/profile.route";
 import onboardingRoutes from "./routes/onboarding.route";
+import workoutRoutes from "./routes/workout.route";
 import { refreshToken } from "./controllers/auth.controller";
 import { TryCatch } from "./middlewares/error";
 import prisma from "./lib/prismaClient";
@@ -42,6 +43,7 @@ app.use("/api/cycle", cycleRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/food", foodRoutes);
 app.use("/api/onboarding", onboardingRoutes);
+app.use("/api/workout", workoutRoutes);
 
 // Token refresh route (also available at /api/token/refresh per frontend requirements)
 app.post("/api/token/refresh", TryCatch(refreshToken));

@@ -15,6 +15,7 @@ const cycle_route_1 = __importDefault(require("./routes/cycle.route"));
 const food_route_1 = __importDefault(require("./routes/food.route"));
 const profile_route_1 = __importDefault(require("./routes/profile.route"));
 const onboarding_route_1 = __importDefault(require("./routes/onboarding.route"));
+const workout_route_1 = __importDefault(require("./routes/workout.route"));
 const auth_controller_1 = require("./controllers/auth.controller");
 const error_1 = require("./middlewares/error");
 const prismaClient_1 = __importDefault(require("./lib/prismaClient"));
@@ -36,6 +37,7 @@ app.use("/api/cycle", cycle_route_1.default);
 app.use("/api/profile", profile_route_1.default);
 app.use("/api/food", food_route_1.default);
 app.use("/api/onboarding", onboarding_route_1.default);
+app.use("/api/workout", workout_route_1.default);
 // Token refresh route (also available at /api/token/refresh per frontend requirements)
 app.post("/api/token/refresh", (0, error_1.TryCatch)(auth_controller_1.refreshToken));
 app.get("/", (req, res) => {

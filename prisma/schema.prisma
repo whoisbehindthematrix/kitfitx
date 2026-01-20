@@ -13,150 +13,150 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model User {
-  id             String       @id @default(cuid())
-  email          String?      @unique
-  displayName    String?
-  avatarUrl      String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  role           Role         @default(USER)
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  displayName String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  role        Role     @default(USER)
 
-
-  profile              UserProfile?
-  cycleEntries         CycleEntry[]
-  predictions          PredictionData[]
-  quickNotes           QuickNote[]
-  onboarding           Onboarding?
-  onboardingQuestions  OnboardingQuestions?
-  scannedFoods         ScannedFood[]
-  foodLogs             FoodLog[]
+  profile             UserProfile?
+  cycleEntries        CycleEntry[]
+  predictions         PredictionData[]
+  quickNotes          QuickNote[]
+  onboarding          Onboarding?
+  onboardingQuestions OnboardingQuestions?
+  scannedFoods        ScannedFood[]
+  foodLogs            FoodLog[]
+  workoutTemplates    WorkoutTemplate[]
+  workoutSessions     WorkoutSession[]
+  exerciseEntries     ExerciseEntry[]
+  ExerciseLibrary     ExerciseLibrary[]
 }
 
 // ===========================================
 // USER PROFILE
 // ===========================================
 model UserProfile {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  user                  User     @relation(fields: [userId], references: [id])
-  
-  fullName              String?
-  dateOfBirth           DateTime?
-  gender                String?
-  timezone              String?
-  
-  averageCycleLength     Int      @default(28)
-  periodDuration         Int      @default(5)
-  lutealPhaseDays        Int      @default(14)
-  lastPeriodStart        DateTime?
-  menopauseStatus        String?  // "pre" | "peri" | "post" menopauseStatus is a medical lifecycle indicator for women.
-  
-  wellnessGoals          String[] @default([])
-  dailyCalorieGoal       Int?
-  activityLevel          String?
-  height                 Float?
-  weight                 Float?
-  targetWeight           Float?
-  unitsSystem            String?  // "metric" | "imperial"
-  
-  theme                  String?  // "light" | "dark" | "auto"
-  notifications          Json?
-  language               String?
-  
-  onboardingCompleted    Boolean  @default(false)
-  
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  lastSyncedAt           DateTime?
-  appVersion             String?
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  fullName    String?
+  dateOfBirth DateTime?
+  gender      String?
+  timezone    String?
+
+  averageCycleLength Int       @default(28)
+  periodDuration     Int       @default(5)
+  lutealPhaseDays    Int       @default(14)
+  lastPeriodStart    DateTime?
+  menopauseStatus    String? // "pre" | "peri" | "post" menopauseStatus is a medical lifecycle indicator for women.
+
+  wellnessGoals    String[] @default([])
+  dailyCalorieGoal Int?
+  activityLevel    String?
+  height           Float?
+  weight           Float?
+  targetWeight     Float?
+  unitsSystem      String? // "metric" | "imperial"
+
+  theme         String? // "light" | "dark" | "auto"
+  notifications Json?
+  language      String?
+
+  onboardingCompleted Boolean @default(false)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastSyncedAt DateTime?
+  appVersion   String?
 }
 
 // ===========================================
 // CYCLE ENTRIES (Daily logs)
 // ===========================================
 model CycleEntry {
-  id             String     @id @default(cuid())
-  userId         String
-  user           User       @relation(fields: [userId], references: [id])
-  
-  date           DateTime
-  isPeriod       Boolean
-  flowIntensity  String?     // light | medium | heavy | spotting
-  symptoms       Json?
-  notes          String?
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  date          DateTime
+  isPeriod      Boolean
+  flowIntensity String? // light | medium | heavy | spotting
+  symptoms      Json?
+  notes         String?
 }
 
 // ===========================================
 // PREDICTIONS (Generated insights)
 // ===========================================
 model PredictionData {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   nextPeriod    DateTime?
   ovulation     DateTime?
-  fertileWindow Json?       // { start, peak, end, confidence }
+  fertileWindow Json? // { start, peak, end, confidence }
   analytics     Json?
-  
-  createdAt     DateTime   @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 // ===========================================
 // QUICK NOTES (User quick notes)
 // ===========================================
 model QuickNote {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  date          DateTime
-  title         String
-  icon          String
-  text          String?
-  reminder      Boolean    @default(false)
-  reminderTime  String?    // Time string (HH:mm format)
-  
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  date         DateTime
+  title        String
+  icon         String
+  text         String?
+  reminder     Boolean  @default(false)
+  reminderTime String? // Time string (HH:mm format)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, date])
 }
-
 
 // ===========================================
 // ONBOARDING (Basic Profile Information)
 // ===========================================
 model Onboarding {
-  id                  String    @id @default(cuid())
-  userId              String    @unique
-  user                User      @relation(fields: [userId], references: [id])
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
   // Profile Information
-  dateOfBirth         DateTime?
-  
+  dateOfBirth DateTime?
+
   // Physical Measurements
-  weight              Float?    // Actual weight value
-  height              Float?    // Actual height value
-  targetWeight        Float?
-  unitsSystem         String?   // "metric" | "imperial"
-  
+  weight       Float? // Actual weight value
+  height       Float? // Actual height value
+  targetWeight Float?
+  unitsSystem  String? // "metric" | "imperial"
+
   // Nutrition
-  dailyCalorieGoal    Int?
-  
+  dailyCalorieGoal Int?
+
   // Cycle Information (REQUIRED)
-  averageCycleLength  Int       @default(28)
-  periodDuration      Int       @default(5)
-  
+  averageCycleLength Int @default(28)
+  periodDuration     Int @default(5)
+
   // Metadata
-  isCompleted         Boolean   @default(false)
-  completedAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([userId])
 }
 
@@ -164,35 +164,35 @@ model Onboarding {
 // ONBOARDING QUESTIONS (Questionnaire)
 // ===========================================
 model OnboardingQuestions {
-  id                  String    @id @default(cuid())
-  userId              String    @unique
-  user                User      @relation(fields: [userId], references: [id])
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
   // Health & Reproductive
-  reproductiveStage   String?
-  healthGoal          String?
-  
+  reproductiveStage String?
+  healthGoal        String?
+
   // Birth Control
-  birthControl        String[]  @default([])
-  
+  birthControl String[] @default([])
+
   // Medical & Symptoms
-  medicalDiagnoses    String[]  @default([])
-  physicalSymptoms    String[]  @default([])  // max 3 items
-  
+  medicalDiagnoses String[] @default([])
+  physicalSymptoms String[] @default([]) // max 3 items
+
   // Mood & Stress
-  pmsMood             String?
-  stressLevel         String?
-  
+  pmsMood     String?
+  stressLevel String?
+
   // Nutrition
-  foodStruggles       String[]  @default([])
-  dietaryLifestyle     String?
-  
+  foodStruggles    String[] @default([])
+  dietaryLifestyle String?
+
   // Metadata
-  isCompleted         Boolean   @default(false)
-  completedAt         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([userId])
 }
 
@@ -202,73 +202,73 @@ model OnboardingQuestions {
 
 // AI Scanned Food (per user)
 model ScannedFood {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
-  
-  foodName      String
-  calories      Int
-  proteinGrams  Float
-  fatGrams      Float
-  carbsGrams    Float
-  notes         String?
-  
-  imageUrl      String?   // optional (Cloudinary or stored URL)
-  source        String    @default("AI") // AI | MANUAL
-  
-  createdAt     DateTime  @default(now())
-  
-  foodLogs      FoodLog[]
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  foodName     String
+  calories     Int
+  proteinGrams Float
+  fatGrams     Float
+  carbsGrams   Float
+  notes        String?
+
+  imageUrl String? // optional (Cloudinary or stored URL)
+  source   String  @default("AI") // AI | MANUAL
+
+  createdAt DateTime @default(now())
+
+  foodLogs FoodLog[]
+
   @@index([userId])
   @@index([userId, createdAt])
 }
 
 // Global Food List (Admin controlled)
 model GlobalFood {
-  id            String    @id @default(cuid())
-  
-  name          String
-  category      FoodCategory
-  
-  calories      Int
-  proteinGrams  Float
-  fatGrams      Float
-  carbsGrams    Float
-  
-  imageUrl      String?   // optional image URL
-  
-  isActive      Boolean   @default(true)
-  
-  createdBy     String    // admin userId
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  foodLogs      FoodLog[]
-  
+  id String @id @default(cuid())
+
+  name     String
+  category FoodCategory
+
+  calories     Int
+  proteinGrams Float
+  fatGrams     Float
+  carbsGrams   Float
+
+  imageUrl String? // optional image URL
+
+  isActive Boolean @default(true)
+
+  createdBy String // admin userId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  foodLogs FoodLog[]
+
   @@index([category, isActive])
   @@index([isActive])
 }
 
 // Daily Food Log (what user actually eats)
 model FoodLog {
-  id            String        @id @default(cuid())
-  userId        String
-  user          User          @relation(fields: [userId], references: [id])
-  
-  date          DateTime      // normalize to 00:00
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  date DateTime // normalize to 00:00
+
   // Either from global food OR scanned food (never both)
   globalFoodId  String?
   scannedFoodId String?
-  
-  quantity      Float         @default(1) // servings
-  
-  globalFood    GlobalFood?   @relation(fields: [globalFoodId], references: [id])
-  scannedFood   ScannedFood?  @relation(fields: [scannedFoodId], references: [id])
-  
-  createdAt     DateTime      @default(now())
-  
+
+  quantity Float @default(1) // servings
+
+  globalFood  GlobalFood?  @relation(fields: [globalFoodId], references: [id])
+  scannedFood ScannedFood? @relation(fields: [scannedFoodId], references: [id])
+
+  createdAt DateTime @default(now())
+
   @@index([userId, date])
   @@index([date])
 }
@@ -283,4 +283,132 @@ enum FoodCategory {
 enum Role {
   USER
   ADMIN
+}
+
+// ===========================================
+// WORKOUT & EXERCISE MODELS
+// ===========================================
+
+// Exercise library (public/shared exercises)
+model ExerciseLibrary {
+  id                   String              @id @default(cuid())
+  name                 String
+  category             ExerciseCategory
+  description          String?
+  instructions         String[]            @default([]) // array of instruction steps
+  primaryMuscles       String[]            @default([])
+  secondaryMuscles     String[]            @default([])
+  equipment            String[]            @default([])
+  difficulty           ExerciseDifficulty?
+  durationMinutes      Int? // for cardio/yoga
+  caloriesPerMinute    Decimal?            @db.Decimal(4, 2) // estimated
+  phaseRecommendations String[]            @default([]) // ['menstrual', 'follicular', 'ovulatory', 'luteal']
+  imageUrl             String?
+  videoUrl             String? // optional demo video
+  isActive             Boolean             @default(true)
+  createdBy            String? // NULL for system exercises, userId for custom
+  user                 User?               @relation(fields: [createdBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exerciseEntries ExerciseEntry[]
+
+  @@index([category, isActive])
+  @@index([isActive])
+  @@index([createdBy])
+}
+
+// Workout templates (user-created or system templates)
+model WorkoutTemplate {
+  id     String  @id @default(cuid())
+  userId String? // NULL for system templates
+  user   User?   @relation(fields: [userId], references: [id])
+
+  name                     String
+  description              String?
+  category                 String? // 'Push', 'Pull', 'Legs', 'Full Body', etc.
+  difficulty               ExerciseDifficulty?
+  estimatedDurationMinutes Int?
+  isPublic                 Boolean             @default(false) // if user wants to share
+  isSystemTemplate         Boolean             @default(false)
+  exercises                Json                @default("[]") // array of exercise configs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workoutSessions WorkoutSession[]
+
+  @@index([userId])
+  @@index([isSystemTemplate, isPublic])
+}
+
+// Workout sessions (completed workouts)
+model WorkoutSession {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  templateId String?
+  template   WorkoutTemplate? @relation(fields: [templateId], references: [id])
+
+  templateName    String? // denormalized for history
+  date            DateTime  @db.Date
+  startTime       DateTime?
+  endTime         DateTime?
+  durationMinutes Int?
+  exercises       Json      @default("[]") // full exercise data with sets
+  totalVolume     Decimal   @default(0) @db.Decimal(10, 2) // sum of (weight * reps)
+  totalSets       Int       @default(0)
+  totalReps       Int       @default(0)
+  notes           String?
+  completed       Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([date])
+  @@index([templateId])
+}
+
+// Exercise entries (simple cardio/yoga tracking)
+model ExerciseEntry {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  exerciseId String?
+  exercise   ExerciseLibrary? @relation(fields: [exerciseId], references: [id])
+
+  exerciseName    String // denormalized
+  date            DateTime @db.Date
+  durationMinutes Int?
+  caloriesBurned  Int?
+  distanceKm      Decimal? @db.Decimal(6, 2) // for running/cycling
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([exerciseId])
+  @@index([date])
+}
+
+enum ExerciseCategory {
+  chest
+  back
+  shoulders
+  arms
+  legs
+  core
+  cardio
+  yoga
+  pilates
+  dance
+}
+
+enum ExerciseDifficulty {
+  beginner
+  intermediate
+  advanced
 }
