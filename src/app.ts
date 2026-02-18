@@ -10,6 +10,10 @@ import foodRoutes from "./routes/food.route";
 import profileRoutes from "./routes/profile.route";
 import onboardingRoutes from "./routes/onboarding.route";
 import workoutRoutes from "./routes/workout.route";
+import insightsRoutes from "./routes/insights.route";
+import fertilityRoutes from "./routes/fertility.route";
+import moodRoutes from "./routes/mood.route";
+import predictionRoutes from "./routes/prediction.route";
 import { refreshToken } from "./controllers/auth.controller";
 import { TryCatch } from "./middlewares/error";
 import prisma from "./lib/prismaClient";
@@ -44,6 +48,10 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/food", foodRoutes);
 app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/workout", workoutRoutes);
+app.use("/api/insights", insightsRoutes);
+app.use("/api/fertility", fertilityRoutes);
+app.use("/api/mood", moodRoutes);
+app.use("/api/predictions", predictionRoutes);
 
 // Token refresh route (also available at /api/token/refresh per frontend requirements)
 app.post("/api/token/refresh", TryCatch(refreshToken));
