@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prismaClient";
-import { cycleEntrySchema, quickNoteSchema, quickNoteUpdateSchema, quickNoteSyncSchema } from "../validation/cycleSchemas.validation";
+import { cycleEntrySchema, cycleEntryBulkDeleteSchema, quickNoteSchema, quickNoteUpdateSchema, quickNoteSyncSchema } from "../validation/cycleSchemas.validation";
 import { ZodError } from "zod";
 import ErrorHandler from "@/utils/errorHandler.js";
 
@@ -42,6 +42,71 @@ export const getCycleEntries = async (req: Request, res: Response) => {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch entries" });
   }
+};
+
+// DELETE /entries/:id - Delete a single cycle entry by ID
+export const deleteCycleEntryById = async (req: Request, res: Response) => {
+  const userId = req.user?.sub;
+  if (!userId) {
+    throw new ErrorHandler("User not authenticated", 401);
+  }
+
+  const { id } = req.params;
+  if (!id?.trim()) {
+    throw new ErrorHandler("Entry ID is required", 400);
+  }
+
+  const entry = await prisma.cycleEntry.findFirst({
+    where: { id: id.trim(), userId },
+  });
+
+  if (!entry) {
+    throw new ErrorHandler("Cycle entry not found", 404);
+  }
+
+  await prisma.cycleEntry.delete({
+    where: { id: entry.id },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Cycle entry deleted successfully",
+  });
+};
+
+// DELETE /entries/bulk - Delete multiple cycle entries by IDs
+export const deleteCycleEntries = async (req: Request, res: Response) => {
+  const userId = req.user?.sub;
+  if (!userId) {
+    throw new ErrorHandler("User not authenticated", 401);
+  }
+
+  const parseResult = cycleEntryBulkDeleteSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    throw new ErrorHandler(
+      "Invalid request: " + parseResult.error.issues.map((e) => e.message).join(", "),
+      400
+    );
+  }
+
+  const { ids } = parseResult.data;
+  const uniqueIds = [...new Set(ids)];
+
+  const result = await prisma.cycleEntry.deleteMany({
+    where: {
+      id: { in: uniqueIds },
+      userId,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message:
+      result.count === 1
+        ? "1 cycle entry deleted successfully"
+        : `${result.count} cycle entries deleted successfully`,
+    deletedCount: result.count,
+  });
 };
 
 // ===========================================

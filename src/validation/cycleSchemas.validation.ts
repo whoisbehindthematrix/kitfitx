@@ -10,6 +10,15 @@ export const cycleEntrySchema = z.object({
 
 export type CycleEntryInput = z.infer<typeof cycleEntrySchema>;
 
+/** Body for bulk delete: non-empty array of entry IDs, max 100 per request */
+export const cycleEntryBulkDeleteSchema = z.object({
+  ids: z
+    .array(z.string().min(1, "Each ID must be a non-empty string"))
+    .min(1, "At least one entry ID is required")
+    .max(100, "Cannot delete more than 100 entries at once"),
+});
+export type CycleEntryBulkDeleteInput = z.infer<typeof cycleEntryBulkDeleteSchema>;
+
 export const quickNoteSchema = z.object({
   date: z.string().datetime(),
   title: z.string().min(1, "Title is required"),

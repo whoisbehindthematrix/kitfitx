@@ -8,7 +8,9 @@ import {
   createQuickNote,
   updateQuickNote,
   deleteQuickNote,
-  syncQuickNotes
+  syncQuickNotes,
+  deleteCycleEntryById,
+  deleteCycleEntries
 } from "../controllers/cycle.controllers";
 
 const router = express.Router();
@@ -16,6 +18,8 @@ const router = express.Router();
 // Cycle entry routes
 router.post("/", authMiddleware, TryCatch(addCycleEntry));
 router.get("/", authMiddleware, TryCatch(getCycleEntries));
+router.delete("/bulk", authMiddleware, TryCatch(deleteCycleEntries));
+router.delete("/:id", authMiddleware, TryCatch(deleteCycleEntryById));
 
 // Quick notes routes
 router.get("/quick-notes", authMiddleware, TryCatch(getQuickNotes));
