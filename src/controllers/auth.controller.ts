@@ -1,9 +1,14 @@
 import { Request, Response } from "express";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import prisma from "../lib/prismaClient";
 import { Prisma } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import ErrorHandler from "@/utils/errorHandler.js";
 import { updateProfileSchema } from "../validation/profileSchemas.validation.js";
+
+const JWKS = createRemoteJWKSet(
+  new URL(process.env.SUPABASE_JWT_KEY as string)
+);
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -237,6 +242,95 @@ export const login = async (req: Request, res: Response) => {
     throw new ErrorHandler(
       err instanceof Error ? err.message : "Login failed",
       500
+    );
+  }
+};
+
+/**
+ * Google sign-in / register (token exchange).
+ * Call this after the frontend completes Supabase signInWithOAuth('google') and has
+ * access_token (and optionally refresh_token). Verifies the Supabase JWT, syncs user
+ * to your DB, and returns the same shape as login/register.
+ */
+export const googleAuth = async (req: Request, res: Response) => {
+  console.log("[Google Auth] POST /api/auth/google hit", {
+    hasBody: !!req.body && Object.keys(req.body).length > 0,
+    hasAuthHeader: !!req.headers.authorization,
+  });
+  try {
+    const access_token =
+      req.body.access_token ?? (req.headers.authorization ?? "").replace("Bearer ", "");
+
+    if (!access_token) {
+      throw new ErrorHandler("access_token is required (body or Authorization header)", 400);
+    }
+
+    const { payload } = (await jwtVerify(access_token, JWKS)) as {
+      payload: { sub: string; email?: string; user_metadata?: Record<string, unknown> };
+    };
+
+    const userId = String(payload.sub);
+    const userEmail = (payload.email as string) || null;
+    const displayName =
+      (payload.user_metadata?.full_name as string) ||
+      (payload.user_metadata?.name as string) ||
+      (userEmail?.split("@")[0] ?? null);
+    const avatarUrl = (payload.user_metadata?.avatar_url as string) || null;
+    const gender = (payload.user_metadata?.gender as string) || "female";
+
+    const user = await prisma.user.upsert({
+      where: { id: userId },
+      update: { email: userEmail, displayName, avatarUrl },
+      create: {
+        id: userId,
+        email: userEmail,
+        displayName,
+        avatarUrl,
+        role: "USER",
+      },
+      include: { profile: true },
+    });
+
+    if (!user.profile) {
+      await prisma.userProfile.create({
+        data: { userId: user.id, gender },
+      });
+    }
+
+    const userWithProfile = await prisma.user.findUnique({
+      where: { id: user.id },
+      include: { profile: true },
+    });
+
+    if (!userWithProfile) {
+      throw new ErrorHandler("Failed to fetch user after sync", 500);
+    }
+
+    const refresh_token = req.body.refresh_token as string | undefined;
+
+    res.status(200).json({
+      success: true,
+      message: "Google sign-in successful",
+      user: {
+        id: userWithProfile.id,
+        email: userWithProfile.email,
+        displayName: userWithProfile.displayName,
+        avatarUrl: userWithProfile.avatarUrl,
+        onboardingCompleted: userWithProfile.profile?.onboardingCompleted ?? false,
+      },
+      session: {
+        access_token,
+        refresh_token: refresh_token ?? null,
+        expires_at: null,
+        expires_in: null,
+      },
+    });
+  } catch (err) {
+    console.error("[Google Auth] Error:", err);
+    if (err instanceof ErrorHandler) throw err;
+    throw new ErrorHandler(
+      err instanceof Error ? err.message : "Google sign-in failed",
+      err instanceof Error && err.message.includes("token") ? 401 : 500
     );
   }
 };
